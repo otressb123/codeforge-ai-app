@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Bot, User, Loader2, Trash2 } from "lucide-react";
+import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface Message {
   role: "user" | "assistant";
@@ -12,15 +13,18 @@ interface AIChatPanelProps {
   onCodeGenerated?: (code: string, filename: string) => void;
 }
 
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+
 const AIChatPanel = ({ onCodeGenerated }: AIChatPanelProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hi! I'm your AI coding assistant. I can help you:\n\n• Generate code for new features\n• Explain existing code\n• Debug issues\n• Suggest improvements\n\nWhat would you like to build today?",
+      content: "Hi! I'm your AI coding assistant powered by advanced AI. I can help you:\n\n• Generate code for new features\n• Explain existing code\n• Debug issues\n• Suggest improvements\n\nWhat would you like to build today?",
     },
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -31,37 +35,99 @@ const AIChatPanel = ({ onCodeGenerated }: AIChatPanelProps) => {
     scrollToBottom();
   }, [messages]);
 
+  const streamChat = async (allMessages: Message[]) => {
+    const response = await fetch(CHAT_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      body: JSON.stringify({ messages: allMessages }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      if (response.status === 429) {
+        throw new Error("Rate limit exceeded. Please wait a moment.");
+      }
+      if (response.status === 402) {
+        throw new Error("AI credits exhausted. Please add more credits.");
+      }
+      throw new Error(errorData.error || "Failed to get AI response");
+    }
+
+    if (!response.body) {
+      throw new Error("No response body");
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let textBuffer = "";
+    let assistantContent = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      textBuffer += decoder.decode(value, { stream: true });
+
+      let newlineIndex: number;
+      while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+        let line = textBuffer.slice(0, newlineIndex);
+        textBuffer = textBuffer.slice(newlineIndex + 1);
+
+        if (line.endsWith("\r")) line = line.slice(0, -1);
+        if (line.startsWith(":") || line.trim() === "") continue;
+        if (!line.startsWith("data: ")) continue;
+
+        const jsonStr = line.slice(6).trim();
+        if (jsonStr === "[DONE]") break;
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) {
+            assistantContent += content;
+            setMessages((prev) => {
+              const lastMsg = prev[prev.length - 1];
+              if (lastMsg?.role === "assistant" && prev.length > 1) {
+                return prev.map((m, i) =>
+                  i === prev.length - 1 ? { ...m, content: assistantContent } : m
+                );
+              }
+              return [...prev.slice(0, -1), { role: "assistant", content: assistantContent }];
+            });
+          }
+        } catch {
+          // Incomplete JSON, put back and wait
+          textBuffer = line + "\n" + textBuffer;
+          break;
+        }
+      }
+    }
+
+    return assistantContent;
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    setMessages([...newMessages, { role: "assistant", content: "" }]);
     setInput("");
     setIsLoading(true);
 
-    // Simulate AI response (in production, this would call an AI API)
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        role: "assistant",
-        content: generateMockResponse(input),
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+    try {
+      await streamChat(newMessages.filter((m) => m.content)); // Filter out empty welcome messages for API
+    } catch (error) {
+      console.error("Chat error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to get response");
+      // Remove the empty assistant message on error
+      setMessages(newMessages);
+    } finally {
       setIsLoading(false);
-    }, 1500);
-  };
-
-  const generateMockResponse = (prompt: string): string => {
-    const lowerPrompt = prompt.toLowerCase();
-    
-    if (lowerPrompt.includes("button")) {
-      return `Here's a beautiful button component:\n\n\`\`\`tsx\nimport { motion } from "framer-motion";\n\nconst GradientButton = ({ children, onClick }) => (\n  <motion.button\n    className="px-6 py-3 rounded-lg bg-gradient-to-r from-primary to-accent text-white font-medium"\n    whileHover={{ scale: 1.05 }}\n    whileTap={{ scale: 0.95 }}\n    onClick={onClick}\n  >\n    {children}\n  </motion.button>\n);\n\`\`\`\n\nWould you like me to add this to your project?`;
     }
-    
-    if (lowerPrompt.includes("navbar") || lowerPrompt.includes("navigation")) {
-      return `I'll create a modern navigation component for you:\n\n\`\`\`tsx\nconst Navbar = () => (\n  <nav className="fixed top-0 w-full glass px-6 py-4">\n    <div className="flex items-center justify-between">\n      <Logo />\n      <NavLinks />\n      <AuthButtons />\n    </div>\n  </nav>\n);\n\`\`\`\n\nShall I implement the full navbar with all subcomponents?`;
-    }
-    
-    return `I understand you want to work on: "${prompt}"\n\nI can help you with that! Here are some suggestions:\n\n1. **Component Structure** - I'll create modular, reusable components\n2. **Styling** - Using Tailwind CSS with your design system\n3. **Animations** - Smooth transitions with Framer Motion\n\nWould you like me to generate the code for this?`;
   };
 
   const clearChat = () => {
@@ -71,6 +137,54 @@ const AIChatPanel = ({ onCodeGenerated }: AIChatPanelProps) => {
         content: "Chat cleared! What would you like to build?",
       },
     ]);
+  };
+
+  const copyToClipboard = (text: string, index: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+    toast.success("Copied to clipboard!");
+  };
+
+  const formatMessage = (content: string) => {
+    // Simple code block detection and formatting
+    const parts = content.split(/(```[\s\S]*?```)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith("```")) {
+        const match = part.match(/```(\w+)?\n?([\s\S]*?)```/);
+        if (match) {
+          const lang = match[1] || "";
+          const code = match[2] || "";
+          return (
+            <div key={i} className="my-2 rounded-lg overflow-hidden bg-background border border-border">
+              <div className="flex items-center justify-between px-3 py-1 bg-secondary/50 text-xs text-muted-foreground">
+                <span>{lang || "code"}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => copyToClipboard(code, i)}
+                >
+                  {copiedIndex === i ? (
+                    <Check className="w-3 h-3 text-success" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
+                </Button>
+              </div>
+              <pre className="p-3 overflow-x-auto text-sm font-mono">
+                <code>{code}</code>
+              </pre>
+            </div>
+          );
+        }
+      }
+      return (
+        <span key={i} className="whitespace-pre-wrap">
+          {part}
+        </span>
+      );
+    });
   };
 
   return (
@@ -114,9 +228,9 @@ const AIChatPanel = ({ onCodeGenerated }: AIChatPanelProps) => {
                     : "bg-secondary text-foreground"
                 }`}
               >
-                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                  {message.content}
-                </pre>
+                <div className="text-sm leading-relaxed">
+                  {message.role === "assistant" ? formatMessage(message.content) : message.content}
+                </div>
               </div>
               {message.role === "user" && (
                 <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center flex-shrink-0">
@@ -126,8 +240,8 @@ const AIChatPanel = ({ onCodeGenerated }: AIChatPanelProps) => {
             </motion.div>
           ))}
         </AnimatePresence>
-        
-        {isLoading && (
+
+        {isLoading && messages[messages.length - 1]?.content === "" && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -156,15 +270,20 @@ const AIChatPanel = ({ onCodeGenerated }: AIChatPanelProps) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-            placeholder="Describe what you want to build..."
-            className="flex-1 bg-input border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground"
+            placeholder="Ask me anything about code..."
+            disabled={isLoading}
+            className="flex-1 bg-input border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground disabled:opacity-50"
           />
           <Button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
             className="bg-primary hover:bg-primary/90 text-primary-foreground glow-primary"
           >
-            <Send className="w-4 h-4" />
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
           </Button>
         </div>
       </div>
