@@ -53,6 +53,7 @@ const initialFiles: FileNode[] = [
 
 const IDE = () => {
   const [activeTab, setActiveTab] = useState<SidebarTab>("files");
+  const [files, setFiles] = useState<FileNode[]>(initialFiles);
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -142,6 +143,122 @@ const IDE = () => {
     toast.success("Running application...");
   };
 
+  // Helper to find parent folder and add node
+  const addNodeToPath = (nodes: FileNode[], pathParts: string[], newNode: FileNode): FileNode[] => {
+    if (pathParts.length === 0) {
+      return [...nodes, newNode];
+    }
+
+    return nodes.map((node) => {
+      if (node.type === "folder" && node.name === pathParts[0]) {
+        if (pathParts.length === 1) {
+          return {
+            ...node,
+            children: [...(node.children || []), newNode],
+          };
+        }
+        return {
+          ...node,
+          children: addNodeToPath(node.children || [], pathParts.slice(1), newNode),
+        };
+      }
+      return node;
+    });
+  };
+
+  // Helper to remove node from path
+  const removeNodeFromPath = (nodes: FileNode[], pathParts: string[]): FileNode[] => {
+    if (pathParts.length === 1) {
+      return nodes.filter((node) => node.name !== pathParts[0]);
+    }
+
+    return nodes.map((node) => {
+      if (node.type === "folder" && node.name === pathParts[0]) {
+        return {
+          ...node,
+          children: removeNodeFromPath(node.children || [], pathParts.slice(1)),
+        };
+      }
+      return node;
+    });
+  };
+
+  // Helper to rename node
+  const renameNodeInPath = (nodes: FileNode[], pathParts: string[], newName: string): FileNode[] => {
+    if (pathParts.length === 1) {
+      return nodes.map((node) =>
+        node.name === pathParts[0] ? { ...node, name: newName } : node
+      );
+    }
+
+    return nodes.map((node) => {
+      if (node.type === "folder" && node.name === pathParts[0]) {
+        return {
+          ...node,
+          children: renameNodeInPath(node.children || [], pathParts.slice(1), newName),
+        };
+      }
+      return node;
+    });
+  };
+
+  const handleCreateFile = useCallback((parentPath: string, fileName: string) => {
+    const pathParts = parentPath.split("/").filter(Boolean);
+    const newFile: FileNode = {
+      name: fileName,
+      type: "file",
+      content: `// ${fileName}\n`,
+    };
+    setFiles((prev) => addNodeToPath(prev, pathParts, newFile));
+    
+    // Open the new file in editor
+    const fullPath = parentPath ? `${parentPath}/${fileName}` : `/${fileName}`;
+    setOpenFiles((prev) => [...prev, { path: fullPath, name: fileName, content: newFile.content || "", isModified: true }]);
+    setActiveFile(fullPath);
+    toast.success(`Created ${fileName}`);
+  }, []);
+
+  const handleCreateFolder = useCallback((parentPath: string, folderName: string) => {
+    const pathParts = parentPath.split("/").filter(Boolean);
+    const newFolder: FileNode = {
+      name: folderName,
+      type: "folder",
+      children: [],
+    };
+    setFiles((prev) => addNodeToPath(prev, pathParts, newFolder));
+    toast.success(`Created folder ${folderName}`);
+  }, []);
+
+  const handleDeleteNode = useCallback((nodePath: string) => {
+    const pathParts = nodePath.split("/").filter(Boolean);
+    setFiles((prev) => removeNodeFromPath(prev, pathParts));
+    
+    // Close the file if it's open
+    setOpenFiles((prev) => prev.filter((f) => !f.path.startsWith(nodePath)));
+    if (activeFile?.startsWith(nodePath)) {
+      setActiveFile(null);
+    }
+    toast.success("Deleted successfully");
+  }, [activeFile]);
+
+  const handleRenameNode = useCallback((nodePath: string, newName: string) => {
+    const pathParts = nodePath.split("/").filter(Boolean);
+    setFiles((prev) => renameNodeInPath(prev, pathParts, newName));
+    
+    // Update open files
+    const oldName = pathParts[pathParts.length - 1];
+    const newPath = nodePath.replace(new RegExp(`${oldName}$`), newName);
+    setOpenFiles((prev) =>
+      prev.map((f) =>
+        f.path === nodePath ? { ...f, path: newPath, name: newName } : f
+      )
+    );
+    if (activeFile === nodePath) {
+      setActiveFile(newPath);
+    }
+    toast.success(`Renamed to ${newName}`);
+  }, [activeFile]);
+
   const currentFile = openFiles.find((f) => f.path === activeFile);
 
   // Generate preview HTML from open files
@@ -176,7 +293,17 @@ const IDE = () => {
   const renderSidePanel = () => {
     switch (activeTab) {
       case "files":
-        return <FileExplorer files={initialFiles} onFileSelect={handleFileSelect} selectedPath={selectedPath} />;
+        return (
+          <FileExplorer
+            files={files}
+            onFileSelect={handleFileSelect}
+            selectedPath={selectedPath}
+            onCreateFile={handleCreateFile}
+            onCreateFolder={handleCreateFolder}
+            onDeleteNode={handleDeleteNode}
+            onRenameNode={handleRenameNode}
+          />
+        );
       case "search":
         return <SearchPanel />;
       case "ai":
