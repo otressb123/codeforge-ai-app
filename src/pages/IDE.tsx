@@ -10,6 +10,7 @@ import PreviewPanel from "@/components/PreviewPanel";
 import SearchPanel from "@/components/SearchPanel";
 import TerminalPanel from "@/components/TerminalPanel";
 import SettingsPanel from "@/components/SettingsPanel";
+import NewProjectDialog from "@/components/NewProjectDialog";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { toast } from "sonner";
 
@@ -57,7 +58,8 @@ const IDE = () => {
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [projectName] = useState("my-awesome-app");
+  const [projectName, setProjectName] = useState("my-awesome-app");
+  const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
 
   const findFileContent = useCallback((files: FileNode[], path: string): string | null => {
     for (const file of files) {
@@ -141,6 +143,15 @@ const IDE = () => {
 
   const handleRun = () => {
     toast.success("Running application...");
+  };
+
+  const handleNewProject = (name: string, newFiles: FileNode[]) => {
+    setProjectName(name);
+    setFiles(newFiles);
+    setOpenFiles([]);
+    setActiveFile(null);
+    setSelectedPath(null);
+    toast.success(`Created project: ${name}`);
   };
 
   // Helper to find parent folder and add node
@@ -319,8 +330,18 @@ const IDE = () => {
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      <TopBar projectName={projectName} onSave={handleSave} onRun={handleRun} />
-
+      <TopBar 
+        projectName={projectName} 
+        onSave={handleSave} 
+        onRun={handleRun} 
+        onNewProject={() => setIsNewProjectOpen(true)} 
+      />
+      
+      <NewProjectDialog
+        open={isNewProjectOpen}
+        onOpenChange={setIsNewProjectOpen}
+        onCreateProject={handleNewProject}
+      />
       <div className="flex-1 flex overflow-hidden">
         <ActivityBar activeTab={activeTab} onTabChange={setActiveTab} />
 
