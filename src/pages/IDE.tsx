@@ -105,6 +105,34 @@ const IDE = () => {
     );
   }, [activeFile]);
 
+  // Handle AI-generated code - add to editor
+  const handleAICodeGenerated = useCallback((code: string, filename: string) => {
+    const path = `/src/${filename}`;
+    
+    // Check if file already exists
+    const existingFile = openFiles.find((f) => f.name === filename);
+    
+    if (existingFile) {
+      // Update existing file
+      setOpenFiles((prev) =>
+        prev.map((f) =>
+          f.name === filename ? { ...f, content: code, isModified: true } : f
+        )
+      );
+      setActiveFile(existingFile.path);
+    } else {
+      // Create new file tab
+      const newFile: OpenFile = {
+        path,
+        name: filename,
+        content: code,
+        isModified: true,
+      };
+      setOpenFiles((prev) => [...prev, newFile]);
+      setActiveFile(path);
+    }
+  }, [openFiles]);
+
   const handleSave = () => {
     setOpenFiles((prev) => prev.map((f) => ({ ...f, isModified: false })));
     toast.success("All files saved!");
@@ -239,7 +267,7 @@ const IDE = () => {
               </ResizablePanel>
               <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
               <ResizablePanel defaultSize={40}>
-                <AIChatPanel />
+                <AIChatPanel onCodeGenerated={handleAICodeGenerated} />
               </ResizablePanel>
             </ResizablePanelGroup>
           </ResizablePanel>
