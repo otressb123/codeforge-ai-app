@@ -116,6 +116,35 @@ const IDE = () => {
 
   const currentFile = openFiles.find((f) => f.path === activeFile);
 
+  // Generate preview HTML from open files
+  const getPreviewHtml = useCallback(() => {
+    // Find index.html
+    const htmlFile = openFiles.find(f => f.name === "index.html");
+    const cssFile = openFiles.find(f => f.name === "styles.css" || f.name.endsWith(".css"));
+    const appFile = openFiles.find(f => f.name === "App.tsx" || f.name === "App.jsx");
+    
+    if (htmlFile) {
+      let html = htmlFile.content;
+      // Inject CSS if available
+      if (cssFile) {
+        html = html.replace('</head>', `<style>${cssFile.content}</style></head>`);
+      }
+      return html;
+    }
+    
+    // Generate simple preview from current file
+    if (currentFile) {
+      if (currentFile.name.endsWith('.html')) {
+        return currentFile.content;
+      }
+      if (currentFile.name.endsWith('.css')) {
+        return `<!DOCTYPE html><html><head><style>${currentFile.content}</style></head><body><h1>CSS Preview</h1><p>Editing: ${currentFile.name}</p><div class="demo">Demo content</div></body></html>`;
+      }
+    }
+    
+    return null;
+  }, [openFiles, currentFile]);
+
   const renderSidePanel = () => {
     switch (activeTab) {
       case "files":
@@ -206,7 +235,7 @@ const IDE = () => {
           <ResizablePanel defaultSize={25} minSize={20}>
             <ResizablePanelGroup direction="vertical">
               <ResizablePanel defaultSize={60}>
-                <PreviewPanel />
+                <PreviewPanel html={getPreviewHtml()} />
               </ResizablePanel>
               <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
               <ResizablePanel defaultSize={40}>
