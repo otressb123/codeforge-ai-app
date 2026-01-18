@@ -109,6 +109,44 @@ const AIChatPanel = ({ onCodeGenerated }: AIChatPanelProps) => {
     return assistantContent;
   };
 
+  // Extract code blocks from AI response
+  const extractCodeBlocks = (content: string): { code: string; language: string; filename: string }[] => {
+    const codeBlocks: { code: string; language: string; filename: string }[] = [];
+    const regex = /```(\w+)?\n?([\s\S]*?)```/g;
+    let match;
+    
+    while ((match = regex.exec(content)) !== null) {
+      const lang = match[1] || "text";
+      const code = match[2]?.trim() || "";
+      
+      // Try to detect filename from code or generate one
+      let filename = "";
+      const filenameMatch = code.match(/^\/\/\s*(\S+\.\w+)|^#\s*(\S+\.\w+)|^<!--\s*(\S+\.\w+)/);
+      if (filenameMatch) {
+        filename = filenameMatch[1] || filenameMatch[2] || filenameMatch[3];
+      } else {
+        // Generate filename based on language
+        const extMap: Record<string, string> = {
+          typescript: ".tsx",
+          tsx: ".tsx",
+          javascript: ".js",
+          jsx: ".jsx",
+          html: ".html",
+          css: ".css",
+          json: ".json",
+          python: ".py",
+        };
+        filename = `generated${extMap[lang] || ".txt"}`;
+      }
+      
+      if (code) {
+        codeBlocks.push({ code, language: lang, filename });
+      }
+    }
+    
+    return codeBlocks;
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -119,11 +157,21 @@ const AIChatPanel = ({ onCodeGenerated }: AIChatPanelProps) => {
     setIsLoading(true);
 
     try {
-      await streamChat(newMessages.filter((m) => m.content)); // Filter out empty welcome messages for API
+      const response = await streamChat(newMessages.filter((m) => m.content));
+      
+      // Extract and send code blocks to editor
+      if (response && onCodeGenerated) {
+        const codeBlocks = extractCodeBlocks(response);
+        if (codeBlocks.length > 0) {
+          // Send the first code block to editor
+          const { code, filename } = codeBlocks[0];
+          onCodeGenerated(code, filename);
+          toast.success(`Code added to ${filename}`);
+        }
+      }
     } catch (error) {
       console.error("Chat error:", error);
       toast.error(error instanceof Error ? error.message : "Failed to get response");
-      // Remove the empty assistant message on error
       setMessages(newMessages);
     } finally {
       setIsLoading(false);
