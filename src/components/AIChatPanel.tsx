@@ -9,17 +9,24 @@ interface Message {
   content: string;
 }
 
+interface GeneratedFile {
+  path: string;
+  content: string;
+  language: string;
+}
+
 interface AIChatPanelProps {
   onCodeGenerated?: (code: string, filename: string) => void;
+  onFilesGenerated?: (files: GeneratedFile[]) => void;
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
-const AIChatPanel = ({ onCodeGenerated }: AIChatPanelProps) => {
+const AIChatPanel = ({ onCodeGenerated, onFilesGenerated }: AIChatPanelProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hi! I'm your AI coding assistant powered by advanced AI. I can help you:\n\n• Generate code for new features\n• Explain existing code\n• Debug issues\n• Suggest improvements\n\nWhat would you like to build today?",
+      content: "👋 Hi! I'm your AI coding agent - just like Cursor!\n\nTell me what to build and I'll **automatically generate all the files** for your project.\n\nExamples:\n• \"Build me a landing page for a SaaS product\"\n• \"Create a todo app with local storage\"\n• \"Make a portfolio website\"\n\nWhat would you like me to build?",
     },
   ]);
   const [input, setInput] = useState("");
@@ -109,42 +116,52 @@ const AIChatPanel = ({ onCodeGenerated }: AIChatPanelProps) => {
     return assistantContent;
   };
 
-  // Extract code blocks from AI response
-  const extractCodeBlocks = (content: string): { code: string; language: string; filename: string }[] => {
-    const codeBlocks: { code: string; language: string; filename: string }[] = [];
-    const regex = /```(\w+)?\n?([\s\S]*?)```/g;
+  // Extract code blocks with file paths from AI response (Cursor-style format)
+  const extractCodeBlocks = (content: string): GeneratedFile[] => {
+    const files: GeneratedFile[] = [];
+    // Match ```language:path/to/file.ext or ```language format
+    const regex = /```(\w+)?(?::([^\n]+))?\n([\s\S]*?)```/g;
     let match;
     
     while ((match = regex.exec(content)) !== null) {
       const lang = match[1] || "text";
-      const code = match[2]?.trim() || "";
+      const explicitPath = match[2]?.trim();
+      const code = match[3]?.trim() || "";
       
-      // Try to detect filename from code or generate one
-      let filename = "";
-      const filenameMatch = code.match(/^\/\/\s*(\S+\.\w+)|^#\s*(\S+\.\w+)|^<!--\s*(\S+\.\w+)/);
-      if (filenameMatch) {
-        filename = filenameMatch[1] || filenameMatch[2] || filenameMatch[3];
+      if (!code) continue;
+      
+      let filePath = "";
+      
+      if (explicitPath) {
+        // Use the explicit path from the code block header
+        filePath = explicitPath.startsWith("/") ? explicitPath : `/${explicitPath}`;
       } else {
-        // Generate filename based on language
-        const extMap: Record<string, string> = {
-          typescript: ".tsx",
-          tsx: ".tsx",
-          javascript: ".js",
-          jsx: ".jsx",
-          html: ".html",
-          css: ".css",
-          json: ".json",
-          python: ".py",
-        };
-        filename = `generated${extMap[lang] || ".txt"}`;
+        // Try to detect filename from first line comment
+        const filenameMatch = code.match(/^\/\/\s*(\S+\.\w+)|^#\s*(\S+\.\w+)|^<!--\s*(\S+\.\w+)/);
+        if (filenameMatch) {
+          const filename = filenameMatch[1] || filenameMatch[2] || filenameMatch[3];
+          filePath = `/src/${filename}`;
+        } else {
+          // Generate filename based on language
+          const extMap: Record<string, string> = {
+            typescript: ".tsx",
+            tsx: ".tsx",
+            javascript: ".js",
+            jsx: ".jsx",
+            html: ".html",
+            css: ".css",
+            json: ".json",
+            python: ".py",
+          };
+          const ext = extMap[lang] || ".txt";
+          filePath = `/src/generated-${Date.now()}${ext}`;
+        }
       }
       
-      if (code) {
-        codeBlocks.push({ code, language: lang, filename });
-      }
+      files.push({ path: filePath, content: code, language: lang });
     }
     
-    return codeBlocks;
+    return files;
   };
 
   const handleSend = async () => {
@@ -159,14 +176,24 @@ const AIChatPanel = ({ onCodeGenerated }: AIChatPanelProps) => {
     try {
       const response = await streamChat(newMessages.filter((m) => m.content));
       
-      // Extract and send code blocks to editor
-      if (response && onCodeGenerated) {
-        const codeBlocks = extractCodeBlocks(response);
-        if (codeBlocks.length > 0) {
-          // Send the first code block to editor
-          const { code, filename } = codeBlocks[0];
-          onCodeGenerated(code, filename);
-          toast.success(`Code added to ${filename}`);
+      // Extract and auto-create all files
+      if (response) {
+        const generatedFiles = extractCodeBlocks(response);
+        
+        if (generatedFiles.length > 0) {
+          // Use the new bulk file creation callback if available
+          if (onFilesGenerated) {
+            onFilesGenerated(generatedFiles);
+            toast.success(`🚀 Created ${generatedFiles.length} file${generatedFiles.length > 1 ? 's' : ''} automatically!`, {
+              description: generatedFiles.map(f => f.path).join(', ')
+            });
+          } else if (onCodeGenerated) {
+            // Fallback to single file creation
+            const { content, path } = generatedFiles[0];
+            const filename = path.split('/').pop() || 'generated.tsx';
+            onCodeGenerated(content, filename);
+            toast.success(`Code added to ${filename}`);
+          }
         }
       }
     } catch (error) {
