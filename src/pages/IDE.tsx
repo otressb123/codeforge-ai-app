@@ -318,7 +318,7 @@ const IDE = () => {
       case "search":
         return <SearchPanel />;
       case "ai":
-        return <AIChatPanel />;
+        return <AIChatPanel onCodeGenerated={handleAICodeGenerated} />;
       case "terminal":
         return <TerminalPanel />;
       case "settings":
