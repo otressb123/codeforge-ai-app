@@ -136,22 +136,17 @@ const IDE = () => {
     }
   }, [openFiles]);
 
-  // Handle bulk file generation from AI (Cursor-style)
-  const handleFilesGenerated = useCallback((files: { path: string; content: string; language: string }[]) => {
-    let newFilesState = [...files as unknown as FileNode[]];
-    
-    files.forEach(({ path, content }) => {
+  // Handle bulk file generation from AI (Cursor-style) - auto-save and update preview
+  const handleFilesGenerated = useCallback((generatedFiles: { path: string; content: string; language: string }[]) => {
+    generatedFiles.forEach(({ path, content }) => {
       // Parse the path to create necessary folders
       const pathParts = path.split('/').filter(Boolean);
       const fileName = pathParts.pop()!;
       
       // Create folder structure if needed
-      let currentPath = '';
-      pathParts.forEach((folderName) => {
-        currentPath += `/${folderName}`;
-        const folderParts = currentPath.split('/').filter(Boolean);
+      pathParts.forEach((_, index) => {
+        const folderParts = pathParts.slice(0, index + 1);
         
-        // Check if folder exists
         const folderExists = (nodes: FileNode[], parts: string[]): boolean => {
           if (parts.length === 0) return true;
           const folder = nodes.find(n => n.name === parts[0] && n.type === 'folder');
@@ -162,31 +157,49 @@ const IDE = () => {
         
         setFiles(prev => {
           if (!folderExists(prev, folderParts)) {
-            const newFolder: FileNode = { name: folderName, type: 'folder', children: [] };
+            const newFolder: FileNode = { name: folderParts[folderParts.length - 1], type: 'folder', children: [] };
             return addNodeToPath(prev, folderParts.slice(0, -1), newFolder);
           }
           return prev;
         });
       });
       
-      // Create the file
+      // Create or update the file in file system
       const newFile: FileNode = { name: fileName, type: 'file', content };
-      setFiles(prev => addNodeToPath(prev, pathParts, newFile));
+      setFiles(prev => {
+        // Check if file exists and update it
+        const updateFileInPath = (nodes: FileNode[], parts: string[], file: FileNode): FileNode[] => {
+          if (parts.length === 0) {
+            const existingIndex = nodes.findIndex(n => n.name === file.name);
+            if (existingIndex >= 0) {
+              return nodes.map((n, i) => i === existingIndex ? { ...n, content: file.content } : n);
+            }
+            return [...nodes, file];
+          }
+          return nodes.map(n => {
+            if (n.type === 'folder' && n.name === parts[0]) {
+              return { ...n, children: updateFileInPath(n.children || [], parts.slice(1), file) };
+            }
+            return n;
+          });
+        };
+        return updateFileInPath(prev, pathParts, newFile);
+      });
       
-      // Open the file in editor
+      // Open the file in editor - AUTO-SAVED (isModified: false)
       const fullPath = path.startsWith('/') ? path : `/${path}`;
       setOpenFiles(prev => {
         const exists = prev.find(f => f.path === fullPath);
         if (exists) {
-          return prev.map(f => f.path === fullPath ? { ...f, content, isModified: true } : f);
+          return prev.map(f => f.path === fullPath ? { ...f, content, isModified: false } : f);
         }
-        return [...prev, { path: fullPath, name: fileName, content, isModified: true }];
+        return [...prev, { path: fullPath, name: fileName, content, isModified: false }];
       });
     });
     
     // Set the first file as active
-    if (files.length > 0) {
-      const firstPath = files[0].path.startsWith('/') ? files[0].path : `/${files[0].path}`;
+    if (generatedFiles.length > 0) {
+      const firstPath = generatedFiles[0].path.startsWith('/') ? generatedFiles[0].path : `/${generatedFiles[0].path}`;
       setActiveFile(firstPath);
     }
   }, []);
@@ -327,18 +340,37 @@ const IDE = () => {
 
   const currentFile = openFiles.find((f) => f.path === activeFile);
 
-  // Generate preview HTML from open files
+  // Generate preview HTML from files (including file system for auto-generated files)
   const getPreviewHtml = useCallback(() => {
+    // Helper to find file in file tree
+    const findFileInTree = (nodes: FileNode[], fileName: string): FileNode | null => {
+      for (const node of nodes) {
+        if (node.type === 'file' && node.name === fileName) return node;
+        if (node.children) {
+          const found = findFileInTree(node.children, fileName);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    // First check open files, then fall back to file tree
+    const getFileContent = (fileName: string): string | null => {
+      const openFile = openFiles.find(f => f.name === fileName);
+      if (openFile) return openFile.content;
+      const treeFile = findFileInTree(files, fileName);
+      return treeFile?.content || null;
+    };
+
     // Find index.html
-    const htmlFile = openFiles.find(f => f.name === "index.html");
-    const cssFile = openFiles.find(f => f.name === "styles.css" || f.name.endsWith(".css"));
-    const appFile = openFiles.find(f => f.name === "App.tsx" || f.name === "App.jsx");
+    const htmlContent = getFileContent("index.html");
+    const cssContent = getFileContent("styles.css") || getFileContent("style.css");
     
-    if (htmlFile) {
-      let html = htmlFile.content;
+    if (htmlContent) {
+      let html = htmlContent;
       // Inject CSS if available
-      if (cssFile) {
-        html = html.replace('</head>', `<style>${cssFile.content}</style></head>`);
+      if (cssContent) {
+        html = html.replace('</head>', `<style>${cssContent}</style></head>`);
       }
       return html;
     }
@@ -354,7 +386,7 @@ const IDE = () => {
     }
     
     return null;
-  }, [openFiles, currentFile]);
+  }, [openFiles, currentFile, files]);
 
   const renderSidePanel = () => {
     switch (activeTab) {
