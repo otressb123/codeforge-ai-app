@@ -136,6 +136,61 @@ const IDE = () => {
     }
   }, [openFiles]);
 
+  // Handle bulk file generation from AI (Cursor-style)
+  const handleFilesGenerated = useCallback((files: { path: string; content: string; language: string }[]) => {
+    let newFilesState = [...files as unknown as FileNode[]];
+    
+    files.forEach(({ path, content }) => {
+      // Parse the path to create necessary folders
+      const pathParts = path.split('/').filter(Boolean);
+      const fileName = pathParts.pop()!;
+      
+      // Create folder structure if needed
+      let currentPath = '';
+      pathParts.forEach((folderName) => {
+        currentPath += `/${folderName}`;
+        const folderParts = currentPath.split('/').filter(Boolean);
+        
+        // Check if folder exists
+        const folderExists = (nodes: FileNode[], parts: string[]): boolean => {
+          if (parts.length === 0) return true;
+          const folder = nodes.find(n => n.name === parts[0] && n.type === 'folder');
+          if (!folder) return false;
+          if (parts.length === 1) return true;
+          return folderExists(folder.children || [], parts.slice(1));
+        };
+        
+        setFiles(prev => {
+          if (!folderExists(prev, folderParts)) {
+            const newFolder: FileNode = { name: folderName, type: 'folder', children: [] };
+            return addNodeToPath(prev, folderParts.slice(0, -1), newFolder);
+          }
+          return prev;
+        });
+      });
+      
+      // Create the file
+      const newFile: FileNode = { name: fileName, type: 'file', content };
+      setFiles(prev => addNodeToPath(prev, pathParts, newFile));
+      
+      // Open the file in editor
+      const fullPath = path.startsWith('/') ? path : `/${path}`;
+      setOpenFiles(prev => {
+        const exists = prev.find(f => f.path === fullPath);
+        if (exists) {
+          return prev.map(f => f.path === fullPath ? { ...f, content, isModified: true } : f);
+        }
+        return [...prev, { path: fullPath, name: fileName, content, isModified: true }];
+      });
+    });
+    
+    // Set the first file as active
+    if (files.length > 0) {
+      const firstPath = files[0].path.startsWith('/') ? files[0].path : `/${files[0].path}`;
+      setActiveFile(firstPath);
+    }
+  }, []);
+
   const handleSave = () => {
     setOpenFiles((prev) => prev.map((f) => ({ ...f, isModified: false })));
     toast.success("All files saved!");
@@ -318,7 +373,7 @@ const IDE = () => {
       case "search":
         return <SearchPanel />;
       case "ai":
-        return <AIChatPanel onCodeGenerated={handleAICodeGenerated} />;
+        return <AIChatPanel onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} />;
       case "terminal":
         return <TerminalPanel />;
       case "settings":
@@ -415,7 +470,7 @@ const IDE = () => {
               </ResizablePanel>
               <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
               <ResizablePanel defaultSize={40}>
-                <AIChatPanel onCodeGenerated={handleAICodeGenerated} />
+                <AIChatPanel onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} />
               </ResizablePanel>
             </ResizablePanelGroup>
           </ResizablePanel>
