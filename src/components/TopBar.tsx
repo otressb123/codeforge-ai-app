@@ -7,9 +7,11 @@ interface TopBarProps {
   onRun?: () => void;
   onSave?: () => void;
   onNewProject?: () => void;
+  onGitHub?: () => void;
+  isGitHubConnected?: boolean;
 }
 
-const TopBar = ({ projectName, onRun, onSave, onNewProject }: TopBarProps) => {
+const TopBar = ({ projectName, onRun, onSave, onNewProject, onGitHub, isGitHubConnected }: TopBarProps) => {
   return (
     <header className="h-12 bg-sidebar border-b border-border flex items-center justify-between px-4">
       {/* Left: Logo & Project */}
@@ -70,8 +72,16 @@ const TopBar = ({ projectName, onRun, onSave, onNewProject }: TopBarProps) => {
         <Button variant="ghost" size="icon" className="h-8 w-8">
           <Command className="w-4 h-4" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-8 w-8 relative"
+          onClick={onGitHub}
+        >
           <Github className="w-4 h-4" />
+          {isGitHubConnected && (
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-success" />
+          )}
         </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8">
           <Settings className="w-4 h-4" />

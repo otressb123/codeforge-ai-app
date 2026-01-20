@@ -1,8 +1,16 @@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Button } from "@/components/ui/button";
+import { Github, Download, Cloud } from "lucide-react";
 
-const SettingsPanel = () => {
+interface SettingsPanelProps {
+  onOpenGitHub?: () => void;
+  onExport?: () => void;
+  isGitHubConnected?: boolean;
+}
+
+const SettingsPanel = ({ onOpenGitHub, onExport, isGitHubConnected }: SettingsPanelProps) => {
   return (
     <div className="h-full bg-sidebar overflow-y-auto scrollbar-thin">
       <div className="p-3 border-b border-border">
@@ -55,6 +63,59 @@ const SettingsPanel = () => {
               <Label htmlFor="suggestions" className="text-sm">Inline Suggestions</Label>
               <Switch id="suggestions" defaultChecked />
             </div>
+          </div>
+        </div>
+
+        {/* Source Control */}
+        <div className="space-y-4">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Source Control
+          </h3>
+          
+          <div className="space-y-3">
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              onClick={onOpenGitHub}
+            >
+              <Github className="w-4 h-4" />
+              <span className="flex-1 text-left">GitHub</span>
+              {isGitHubConnected ? (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success">
+                  Connected
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground">Not connected</span>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Export & Backup */}
+        <div className="space-y-4">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Export & Backup
+          </h3>
+          
+          <div className="space-y-3">
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              onClick={onExport}
+            >
+              <Download className="w-4 h-4" />
+              Export as ZIP
+            </Button>
+            
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              disabled
+            >
+              <Cloud className="w-4 h-4" />
+              <span className="flex-1 text-left">Cloud Backup</span>
+              <span className="text-xs text-muted-foreground">Coming Soon</span>
+            </Button>
           </div>
         </div>
 
