@@ -11,6 +11,7 @@ import SearchPanel from "@/components/SearchPanel";
 import TerminalPanel from "@/components/TerminalPanel";
 import SettingsPanel from "@/components/SettingsPanel";
 import NewProjectDialog from "@/components/NewProjectDialog";
+import GitHubDialog from "@/components/GitHubDialog";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { toast } from "sonner";
 
@@ -60,6 +61,8 @@ const IDE = () => {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("my-awesome-app");
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
+  const [isGitHubOpen, setIsGitHubOpen] = useState(false);
+  const [isGitHubConnected, setIsGitHubConnected] = useState(false);
 
   const findFileContent = useCallback((files: FileNode[], path: string): string | null => {
     for (const file of files) {
@@ -211,6 +214,19 @@ const IDE = () => {
 
   const handleRun = () => {
     toast.success("Running application...");
+  };
+
+  const handleGitHubConnect = () => {
+    setIsGitHubConnected(true);
+    toast.success("Connected to GitHub!");
+  };
+
+  const handleGitHubPush = (message: string) => {
+    toast.success(`Pushed changes: ${message}`);
+  };
+
+  const handleGitHubPull = () => {
+    toast.success("Pulled latest changes!");
   };
 
   const handleNewProject = (name: string, newFiles: FileNode[]) => {
@@ -409,9 +425,13 @@ const IDE = () => {
       case "terminal":
         return <TerminalPanel />;
       case "settings":
-        return <SettingsPanel />;
-      default:
-        return null;
+        return (
+          <SettingsPanel
+            onOpenGitHub={() => setIsGitHubOpen(true)}
+            onExport={() => toast.info("Export feature coming soon!")}
+            isGitHubConnected={isGitHubConnected}
+          />
+        );
     }
   };
 
@@ -421,13 +441,24 @@ const IDE = () => {
         projectName={projectName} 
         onSave={handleSave} 
         onRun={handleRun} 
-        onNewProject={() => setIsNewProjectOpen(true)} 
+        onNewProject={() => setIsNewProjectOpen(true)}
+        onGitHub={() => setIsGitHubOpen(true)}
+        isGitHubConnected={isGitHubConnected}
       />
       
       <NewProjectDialog
         open={isNewProjectOpen}
         onOpenChange={setIsNewProjectOpen}
         onCreateProject={handleNewProject}
+      />
+
+      <GitHubDialog
+        open={isGitHubOpen}
+        onOpenChange={setIsGitHubOpen}
+        projectName={projectName}
+        onConnect={handleGitHubConnect}
+        onPush={handleGitHubPush}
+        onPull={handleGitHubPull}
       />
       <div className="flex-1 flex overflow-hidden">
         <ActivityBar activeTab={activeTab} onTabChange={setActiveTab} />
