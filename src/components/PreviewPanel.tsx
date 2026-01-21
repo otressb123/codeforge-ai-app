@@ -1,17 +1,23 @@
-import { Globe, RefreshCw, ExternalLink, Smartphone, Monitor, Tablet } from "lucide-react";
-import { useState } from "react";
+import { Globe, RefreshCw, ExternalLink, Smartphone, Monitor, Tablet, Maximize2 } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { FileNode } from "@/components/FileExplorer";
+import { bundlePreview } from "@/lib/previewBundler";
 
 interface PreviewPanelProps {
   html?: string;
+  files?: FileNode[];
+  onRefresh?: () => void;
 }
 
 type DeviceType = "desktop" | "tablet" | "mobile";
 
-const PreviewPanel = ({ html }: PreviewPanelProps) => {
+const PreviewPanel = ({ html, files, onRefresh }: PreviewPanelProps) => {
   const [device, setDevice] = useState<DeviceType>("desktop");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [previewKey, setPreviewKey] = useState(0);
+  const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
 
   const getDeviceWidth = () => {
     switch (device) {
@@ -24,10 +30,42 @@ const PreviewPanel = ({ html }: PreviewPanelProps) => {
     }
   };
 
+  // Generate preview content
+  const getPreviewContent = useCallback(() => {
+    if (html) return html;
+    if (files && files.length > 0) {
+      return bundlePreview(files);
+    }
+    return null;
+  }, [html, files]);
+
   const handleRefresh = () => {
     setIsRefreshing(true);
+    setPreviewKey(prev => prev + 1);
+    setConsoleLogs([]);
+    onRefresh?.();
     setTimeout(() => setIsRefreshing(false), 500);
   };
+
+  const handleOpenInBrowser = () => {
+    const content = getPreviewContent() || defaultContent;
+    const blob = new Blob([content], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    // Clean up URL after a delay
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  // Listen for console messages from iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "console") {
+        setConsoleLogs(prev => [...prev.slice(-49), event.data.message]);
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   const defaultContent = `
     <!DOCTYPE html>
@@ -119,11 +157,18 @@ const PreviewPanel = ({ html }: PreviewPanelProps) => {
             size="icon"
             className="h-7 w-7"
             onClick={handleRefresh}
+            title="Refresh (Ctrl+R)"
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7">
-            <ExternalLink className="w-4 h-4" />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-7 w-7"
+            onClick={handleOpenInBrowser}
+            title="Open in new tab"
+          >
+            <Maximize2 className="w-4 h-4" />
           </Button>
         </div>
       </div>
@@ -137,14 +182,25 @@ const PreviewPanel = ({ html }: PreviewPanelProps) => {
           transition={{ duration: 0.3 }}
         >
           <iframe
-            key={isRefreshing ? "refreshing" : "stable"}
-            srcDoc={html || defaultContent}
+            key={`preview-${previewKey}`}
+            srcDoc={getPreviewContent() || defaultContent}
             className="w-full h-full min-h-[400px]"
             title="Preview"
-            sandbox="allow-scripts"
+            sandbox="allow-scripts allow-same-origin"
           />
         </motion.div>
       </div>
+
+      {/* Console Logs */}
+      {consoleLogs.length > 0 && (
+        <div className="border-t border-border bg-secondary/30 max-h-24 overflow-y-auto">
+          <div className="p-2 text-xs font-mono">
+            {consoleLogs.map((log, i) => (
+              <div key={i} className="text-muted-foreground">{log}</div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
