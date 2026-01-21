@@ -12,8 +12,10 @@ import TerminalPanel from "@/components/TerminalPanel";
 import SettingsPanel from "@/components/SettingsPanel";
 import NewProjectDialog from "@/components/NewProjectDialog";
 import GitHubDialog from "@/components/GitHubDialog";
+import ExportImportDialog from "@/components/ExportImportDialog";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { toast } from "sonner";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 type SidebarTab = "files" | "search" | "ai" | "terminal" | "settings";
 
@@ -62,7 +64,18 @@ const IDE = () => {
   const [projectName, setProjectName] = useState("my-awesome-app");
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
   const [isGitHubOpen, setIsGitHubOpen] = useState(false);
+  const [isExportImportOpen, setIsExportImportOpen] = useState(false);
   const [isGitHubConnected, setIsGitHubConnected] = useState(false);
+  const [previewKey, setPreviewKey] = useState(0);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onSave: () => handleSave(),
+    onExport: () => setIsExportImportOpen(true),
+    onNewFile: () => handleCreateFile("/src", "NewFile.tsx"),
+    onNewProject: () => setIsNewProjectOpen(true),
+    onRefreshPreview: () => setPreviewKey(prev => prev + 1),
+  });
 
   const findFileContent = useCallback((files: FileNode[], path: string): string | null => {
     for (const file of files) {
@@ -207,13 +220,22 @@ const IDE = () => {
     }
   }, []);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     setOpenFiles((prev) => prev.map((f) => ({ ...f, isModified: false })));
     toast.success("All files saved!");
-  };
+  }, []);
 
   const handleRun = () => {
+    setPreviewKey(prev => prev + 1);
     toast.success("Running application...");
+  };
+
+  const handleImportProject = (importedFiles: FileNode[]) => {
+    setFiles(importedFiles);
+    setOpenFiles([]);
+    setActiveFile(null);
+    setSelectedPath(null);
+    toast.success("Project imported successfully!");
   };
 
   const handleGitHubConnect = () => {
@@ -428,7 +450,7 @@ const IDE = () => {
         return (
           <SettingsPanel
             onOpenGitHub={() => setIsGitHubOpen(true)}
-            onExport={() => toast.info("Export feature coming soon!")}
+            onExport={() => setIsExportImportOpen(true)}
             isGitHubConnected={isGitHubConnected}
           />
         );
@@ -443,6 +465,7 @@ const IDE = () => {
         onRun={handleRun} 
         onNewProject={() => setIsNewProjectOpen(true)}
         onGitHub={() => setIsGitHubOpen(true)}
+        onExportImport={() => setIsExportImportOpen(true)}
         isGitHubConnected={isGitHubConnected}
       />
       
@@ -460,6 +483,15 @@ const IDE = () => {
         onPush={handleGitHubPush}
         onPull={handleGitHubPull}
       />
+
+      <ExportImportDialog
+        open={isExportImportOpen}
+        onOpenChange={setIsExportImportOpen}
+        projectName={projectName}
+        files={files}
+        onImport={handleImportProject}
+      />
+
       <div className="flex-1 flex overflow-hidden">
         <ActivityBar activeTab={activeTab} onTabChange={setActiveTab} />
 
@@ -529,7 +561,12 @@ const IDE = () => {
           <ResizablePanel defaultSize={25} minSize={20}>
             <ResizablePanelGroup direction="vertical">
               <ResizablePanel defaultSize={60}>
-                <PreviewPanel html={getPreviewHtml()} />
+                <PreviewPanel 
+                  key={previewKey}
+                  html={getPreviewHtml()} 
+                  files={files}
+                  onRefresh={() => setPreviewKey(prev => prev + 1)}
+                />
               </ResizablePanel>
               <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
               <ResizablePanel defaultSize={40}>
