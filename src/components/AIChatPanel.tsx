@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown } from "lucide-react";
+import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,7 @@ interface GeneratedFile {
 interface AIChatPanelProps {
   onCodeGenerated?: (code: string, filename: string) => void;
   onFilesGenerated?: (files: GeneratedFile[]) => void;
+  previewHtml?: string | null;
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
@@ -36,17 +37,18 @@ const AI_MODELS = [
   { id: "openai/gpt-5", name: "GPT-5", description: "Best reasoning" },
 ];
 
-const AIChatPanel = ({ onCodeGenerated, onFilesGenerated }: AIChatPanelProps) => {
+const AIChatPanel = ({ onCodeGenerated, onFilesGenerated, previewHtml }: AIChatPanelProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "👋 Hi! I'm your AI coding agent - just like Cursor!\n\nTell me what to build and I'll **automatically generate all the files** for your project.\n\nExamples:\n• \"Build me a landing page for a SaaS product\"\n• \"Create a todo app with local storage\"\n• \"Make a portfolio website\"\n\nWhat would you like me to build?",
+      content: "👋 Hi! I'm your AI coding agent - just like Cursor!\n\nTell me what to build and I'll **automatically generate all the files** for your project.\n\n💡 **Tip:** Click the 👁️ button to share the preview with me so I can see what's rendered!\n\nExamples:\n• \"Build me a landing page for a SaaS product\"\n• \"Create a todo app with local storage\"\n• \"Make a portfolio website\"\n\nWhat would you like me to build?",
     },
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [selectedModel, setSelectedModel] = useState(AI_MODELS[0]);
+  const [previewEnabled, setPreviewEnabled] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -57,14 +59,63 @@ const AIChatPanel = ({ onCodeGenerated, onFilesGenerated }: AIChatPanelProps) =>
     scrollToBottom();
   }, [messages]);
 
+  // Generate a clean summary of the preview HTML for the AI
+  const getPreviewSummary = () => {
+    if (!previewHtml) return null;
+    
+    // Extract meaningful content from HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(previewHtml, 'text/html');
+    
+    // Get text content
+    const bodyText = doc.body?.textContent?.trim().slice(0, 500) || '';
+    
+    // Get structure summary
+    const elements = {
+      headings: doc.querySelectorAll('h1, h2, h3').length,
+      buttons: doc.querySelectorAll('button, .btn, [role="button"]').length,
+      inputs: doc.querySelectorAll('input, textarea, select').length,
+      images: doc.querySelectorAll('img').length,
+      links: doc.querySelectorAll('a').length,
+    };
+    
+    // Get CSS classes used (for understanding styling)
+    const allClasses = Array.from(doc.querySelectorAll('[class]'))
+      .flatMap(el => el.className.split(' '))
+      .filter(Boolean)
+      .slice(0, 20);
+    
+    return `
+[CURRENT PREVIEW STATE]
+Text content preview: "${bodyText.slice(0, 300)}..."
+Page structure: ${elements.headings} headings, ${elements.buttons} buttons, ${elements.inputs} inputs, ${elements.images} images, ${elements.links} links
+CSS classes used: ${allClasses.join(', ')}
+Full HTML length: ${previewHtml.length} characters
+`;
+  };
+
   const streamChat = async (allMessages: Message[]) => {
+    // Inject preview context if enabled
+    let messagesToSend = allMessages;
+    if (previewEnabled && previewHtml) {
+      const previewContext = getPreviewSummary();
+      if (previewContext) {
+        // Add system context about the preview
+        const contextMessage: Message = {
+          role: "user",
+          content: `[SYSTEM: The user has shared their current preview with you. Here's what's currently rendered in the preview panel:\n${previewContext}\n\nUse this information to understand what has been built and suggest improvements or verify if the task is complete.]`
+        };
+        messagesToSend = [contextMessage, ...allMessages];
+      }
+    }
+    
     const response = await fetch(CHAT_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
-      body: JSON.stringify({ messages: allMessages, model: selectedModel.id }),
+      body: JSON.stringify({ messages: messagesToSend, model: selectedModel.id }),
     });
 
     if (!response.ok) {
@@ -308,6 +359,18 @@ const AIChatPanel = ({ onCodeGenerated, onFilesGenerated }: AIChatPanelProps) =>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setPreviewEnabled(!previewEnabled);
+              toast.success(previewEnabled ? "Preview sharing disabled" : "Preview sharing enabled - AI can now see what's rendered!");
+            }}
+            className={`h-7 w-7 ${previewEnabled ? "text-primary bg-primary/20" : ""}`}
+            title={previewEnabled ? "Disable preview sharing" : "Enable preview sharing"}
+          >
+            {previewEnabled ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </Button>
           <Button
             variant="ghost"
             size="icon"

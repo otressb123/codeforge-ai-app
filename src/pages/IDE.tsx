@@ -448,7 +448,7 @@ const IDE = () => {
       case "search":
         return <SearchPanel />;
       case "ai":
-        return <AIChatPanel onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} />;
+        return <AIChatPanel onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} />;
       case "terminal":
         return <TerminalPanel />;
       case "settings":
@@ -575,7 +575,7 @@ const IDE = () => {
               </ResizablePanel>
               <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
               <ResizablePanel defaultSize={40}>
-                <AIChatPanel onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} />
+                <AIChatPanel onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} />
               </ResizablePanel>
             </ResizablePanelGroup>
           </ResizablePanel>
