@@ -1,7 +1,13 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check } from "lucide-react";
+import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
 interface Message {
@@ -22,6 +28,14 @@ interface AIChatPanelProps {
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
+const AI_MODELS = [
+  { id: "google/gemini-3-flash-preview", name: "Gemini 3 Flash", description: "Fast & balanced" },
+  { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash", description: "Good multimodal" },
+  { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro", description: "Most powerful" },
+  { id: "openai/gpt-5-mini", name: "GPT-5 Mini", description: "Fast & capable" },
+  { id: "openai/gpt-5", name: "GPT-5", description: "Best reasoning" },
+];
+
 const AIChatPanel = ({ onCodeGenerated, onFilesGenerated }: AIChatPanelProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -32,6 +46,7 @@ const AIChatPanel = ({ onCodeGenerated, onFilesGenerated }: AIChatPanelProps) =>
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [selectedModel, setSelectedModel] = useState(AI_MODELS[0]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -49,7 +64,7 @@ const AIChatPanel = ({ onCodeGenerated, onFilesGenerated }: AIChatPanelProps) =>
         "Content-Type": "application/json",
         Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
-      body: JSON.stringify({ messages: allMessages }),
+      body: JSON.stringify({ messages: allMessages, model: selectedModel.id }),
     });
 
     if (!response.ok) {
@@ -270,14 +285,38 @@ const AIChatPanel = ({ onCodeGenerated, onFilesGenerated }: AIChatPanelProps) =>
           <Sparkles className="w-4 h-4 text-primary" />
           <h2 className="text-sm font-semibold">AI Assistant</h2>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={clearChat}
-          className="h-7 w-7 hover:text-destructive"
-        >
-          <Trash2 className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2">
+                {selectedModel.name}
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 bg-popover z-50">
+              {AI_MODELS.map((model) => (
+                <DropdownMenuItem
+                  key={model.id}
+                  onClick={() => setSelectedModel(model)}
+                  className={selectedModel.id === model.id ? "bg-accent" : ""}
+                >
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">{model.name}</span>
+                    <span className="text-xs text-muted-foreground">{model.description}</span>
+                  </div>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={clearChat}
+            className="h-7 w-7 hover:text-destructive"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Messages */}
