@@ -13,6 +13,7 @@ import SettingsPanel from "@/components/SettingsPanel";
 import NewProjectDialog from "@/components/NewProjectDialog";
 import GitHubDialog from "@/components/GitHubDialog";
 import ExportImportDialog from "@/components/ExportImportDialog";
+import CommandPalette from "@/components/CommandPalette";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -67,6 +68,7 @@ const IDE = () => {
   const [isExportImportOpen, setIsExportImportOpen] = useState(false);
   const [isGitHubConnected, setIsGitHubConnected] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
@@ -75,6 +77,9 @@ const IDE = () => {
     onNewFile: () => handleCreateFile("/src", "NewFile.tsx"),
     onNewProject: () => setIsNewProjectOpen(true),
     onRefreshPreview: () => setPreviewKey(prev => prev + 1),
+    onQuickOpen: () => setIsCommandPaletteOpen(true),
+    onToggleSidebar: () => setActiveTab(prev => prev === "files" ? "ai" : "files"),
+    onToggleTerminal: () => setActiveTab(prev => prev === "terminal" ? "files" : "terminal"),
   });
 
   const findFileContent = useCallback((files: FileNode[], path: string): string | null => {
@@ -576,6 +581,26 @@ const IDE = () => {
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+
+      {/* Command Palette */}
+      <CommandPalette
+        open={isCommandPaletteOpen}
+        onOpenChange={setIsCommandPaletteOpen}
+        files={files}
+        onFileSelect={handleFileSelect}
+        onSave={handleSave}
+        onExport={() => setIsExportImportOpen(true)}
+        onImport={() => setIsExportImportOpen(true)}
+        onRefreshPreview={() => setPreviewKey(prev => prev + 1)}
+        onNewFile={() => handleCreateFile("/src", "NewFile.tsx")}
+        onNewFolder={() => handleCreateFolder("/src", "new-folder")}
+        onNewProject={() => setIsNewProjectOpen(true)}
+        onOpenGitHub={() => setIsGitHubOpen(true)}
+        onOpenSettings={() => setActiveTab("settings")}
+        onOpenSearch={() => setActiveTab("search")}
+        onOpenTerminal={() => setActiveTab("terminal")}
+        onRun={handleRun}
+      />
     </div>
   );
 };
