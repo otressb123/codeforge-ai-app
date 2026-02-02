@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff } from "lucide-react";
+import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -271,6 +271,43 @@ Full HTML length: ${previewHtml.length} characters
     }
   };
 
+  const checkIfComplete = async () => {
+    if (isLoading) return;
+    
+    // Auto-enable preview if not already
+    if (!previewEnabled) {
+      setPreviewEnabled(true);
+      toast.success("Preview sharing enabled for analysis");
+    }
+    
+    const checkMessage: Message = { 
+      role: "user", 
+      content: "Please analyze the current preview and check if the task is complete. Look at the rendered output and tell me:\n1. What has been built so far\n2. Does it look correct and functional?\n3. Are there any issues or improvements needed?\n4. Is the task complete?" 
+    };
+    
+    const newMessages = [...messages, checkMessage];
+    setMessages([...newMessages, { role: "assistant", content: "" }]);
+    setIsLoading(true);
+
+    try {
+      const response = await streamChat(newMessages.filter((m) => m.content));
+      
+      if (response) {
+        const generatedFiles = extractCodeBlocks(response);
+        if (generatedFiles.length > 0 && onFilesGenerated) {
+          onFilesGenerated(generatedFiles);
+          toast.success(`🚀 Created ${generatedFiles.length} file${generatedFiles.length > 1 ? 's' : ''} automatically!`);
+        }
+      }
+    } catch (error) {
+      console.error("Check error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to analyze preview");
+      setMessages(newMessages);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const clearChat = () => {
     setMessages([
       {
@@ -440,7 +477,19 @@ Full HTML length: ${previewHtml.length} characters
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t border-border">
+      <div className="p-3 border-t border-border space-y-2">
+        {previewHtml && (
+          <Button
+            onClick={checkIfComplete}
+            disabled={isLoading}
+            variant="outline"
+            size="sm"
+            className="w-full gap-2 text-xs border-primary/30 hover:bg-primary/10 hover:border-primary/50"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Check if Complete
+          </Button>
+        )}
         <div className="flex gap-2">
           <input
             type="text"
