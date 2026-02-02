@@ -1,9 +1,10 @@
 import { Globe, RefreshCw, ExternalLink, Smartphone, Monitor, Tablet, Maximize2 } from "lucide-react";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { FileNode } from "@/components/FileExplorer";
 import { bundlePreview } from "@/lib/previewBundler";
+import { capturePreviewScreenshot, PreviewCaptureResult } from "@/hooks/usePreviewCapture";
 
 interface PreviewPanelProps {
   html?: string;
@@ -11,9 +12,22 @@ interface PreviewPanelProps {
   onRefresh?: () => void;
 }
 
+export interface PreviewPanelRef {
+  captureScreenshot: () => Promise<PreviewCaptureResult | null>;
+}
+
 type DeviceType = "desktop" | "tablet" | "mobile";
 
-const PreviewPanel = ({ html, files, onRefresh }: PreviewPanelProps) => {
+const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(({ html, files, onRefresh }, ref) => {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Expose capture function to parent
+  useImperativeHandle(ref, () => ({
+    captureScreenshot: async () => {
+      if (!iframeRef.current) return null;
+      return capturePreviewScreenshot(iframeRef.current);
+    },
+  }));
   const [device, setDevice] = useState<DeviceType>("desktop");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
@@ -182,6 +196,7 @@ const PreviewPanel = ({ html, files, onRefresh }: PreviewPanelProps) => {
           transition={{ duration: 0.3 }}
         >
           <iframe
+            ref={iframeRef}
             key={`preview-${previewKey}`}
             srcDoc={getPreviewContent() || defaultContent}
             className="w-full h-full min-h-[400px]"
@@ -203,6 +218,8 @@ const PreviewPanel = ({ html, files, onRefresh }: PreviewPanelProps) => {
       )}
     </div>
   );
-};
+});
+
+PreviewPanel.displayName = "PreviewPanel";
 
 export default PreviewPanel;

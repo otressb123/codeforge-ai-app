@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import TopBar from "@/components/TopBar";
 import ActivityBar from "@/components/ActivityBar";
@@ -6,7 +6,7 @@ import FileExplorer, { FileNode } from "@/components/FileExplorer";
 import EditorTabs from "@/components/EditorTabs";
 import CodeEditor, { getLanguage } from "@/components/CodeEditor";
 import AIChatPanel from "@/components/AIChatPanel";
-import PreviewPanel from "@/components/PreviewPanel";
+import PreviewPanel, { PreviewPanelRef } from "@/components/PreviewPanel";
 import SearchPanel from "@/components/SearchPanel";
 import TerminalPanel from "@/components/TerminalPanel";
 import SettingsPanel from "@/components/SettingsPanel";
@@ -69,6 +69,13 @@ const IDE = () => {
   const [isGitHubConnected, setIsGitHubConnected] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const previewRef = useRef<PreviewPanelRef>(null);
+
+  // Screenshot capture function for AI
+  const handleCaptureScreenshot = useCallback(async () => {
+    if (!previewRef.current) return null;
+    return previewRef.current.captureScreenshot();
+  }, []);
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
@@ -448,7 +455,7 @@ const IDE = () => {
       case "search":
         return <SearchPanel />;
       case "ai":
-        return <AIChatPanel onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} />;
+        return <AIChatPanel onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} />;
       case "terminal":
         return <TerminalPanel />;
       case "settings":
@@ -567,6 +574,7 @@ const IDE = () => {
             <ResizablePanelGroup direction="vertical">
               <ResizablePanel defaultSize={60}>
                 <PreviewPanel 
+                  ref={previewRef}
                   key={previewKey}
                   html={getPreviewHtml()} 
                   files={files}
@@ -575,7 +583,7 @@ const IDE = () => {
               </ResizablePanel>
               <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
               <ResizablePanel defaultSize={40}>
-                <AIChatPanel onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} />
+                <AIChatPanel onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} />
               </ResizablePanel>
             </ResizablePanelGroup>
           </ResizablePanel>
