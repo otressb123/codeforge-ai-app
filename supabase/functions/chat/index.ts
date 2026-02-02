@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, model } = await req.json();
+    const { messages, model, screenshot } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -22,20 +22,12 @@ serve(async (req) => {
 
     // Use provided model or default to gemini-3-flash-preview
     const selectedModel = model || "google/gemini-3-flash-preview";
-    console.log("Calling AI gateway with", messages.length, "messages using model:", selectedModel);
+    console.log("Calling AI gateway with", messages.length, "messages using model:", selectedModel, screenshot ? "(with screenshot)" : "");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: selectedModel,
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert AI coding agent integrated into CodeForge IDE. You automatically generate complete project structures based on user requests.
+    // Build the messages array for the API
+    const systemMessage = {
+      role: "system",
+      content: `You are an expert AI coding agent integrated into CodeForge IDE. You automatically generate complete project structures based on user requests.
 
 CRITICAL: When the user asks you to build something, you MUST:
 1. Generate ALL necessary files with their FULL PATHS
@@ -68,11 +60,47 @@ RULES:
 - Make the code production-ready
 - Don't ask questions - just build it immediately
 - After showing code, briefly explain what you created
+${screenshot ? "\n- When analyzing screenshots, describe what you see visually and evaluate the UI/UX" : ""}
 
 You are like Cursor or Copilot - when asked to build something, you CREATE THE ENTIRE PROJECT automatically.`
-          },
-          ...messages,
-        ],
+    };
+
+    // Prepare the final messages
+    let finalMessages = [systemMessage, ...messages];
+
+    // If screenshot is provided, add it as a multimodal message
+    if (screenshot) {
+      // Find the last user message and convert it to multimodal format
+      const lastUserMsgIndex = finalMessages.findLastIndex(m => m.role === "user");
+      if (lastUserMsgIndex !== -1) {
+        const lastUserMsg = finalMessages[lastUserMsgIndex];
+        finalMessages[lastUserMsgIndex] = {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: {
+                url: screenshot,
+              },
+            },
+            {
+              type: "text",
+              text: lastUserMsg.content,
+            },
+          ],
+        };
+      }
+    }
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: selectedModel,
+        messages: finalMessages,
         stream: true,
       }),
     });

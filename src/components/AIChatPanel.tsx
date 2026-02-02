@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,7 @@ interface AIChatPanelProps {
   onCodeGenerated?: (code: string, filename: string) => void;
   onFilesGenerated?: (files: GeneratedFile[]) => void;
   previewHtml?: string | null;
+  onCaptureScreenshot?: () => Promise<{ base64: string; width: number; height: number } | null>;
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
@@ -37,7 +38,7 @@ const AI_MODELS = [
   { id: "openai/gpt-5", name: "GPT-5", description: "Best reasoning" },
 ];
 
-const AIChatPanel = ({ onCodeGenerated, onFilesGenerated, previewHtml }: AIChatPanelProps) => {
+const AIChatPanel = ({ onCodeGenerated, onFilesGenerated, previewHtml, onCaptureScreenshot }: AIChatPanelProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -49,6 +50,7 @@ const AIChatPanel = ({ onCodeGenerated, onFilesGenerated, previewHtml }: AIChatP
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [selectedModel, setSelectedModel] = useState(AI_MODELS[0]);
   const [previewEnabled, setPreviewEnabled] = useState(false);
+  const [screenshotEnabled, setScreenshotEnabled] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -94,7 +96,7 @@ Full HTML length: ${previewHtml.length} characters
 `;
   };
 
-  const streamChat = async (allMessages: Message[]) => {
+  const streamChat = async (allMessages: Message[], screenshot?: string | null) => {
     // Inject preview context if enabled
     let messagesToSend = allMessages;
     if (previewEnabled && previewHtml) {
@@ -115,7 +117,11 @@ Full HTML length: ${previewHtml.length} characters
         "Content-Type": "application/json",
         Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
-      body: JSON.stringify({ messages: messagesToSend, model: selectedModel.id }),
+      body: JSON.stringify({ 
+        messages: messagesToSend, 
+        model: selectedModel.id,
+        screenshot: screenshot || undefined,
+      }),
     });
 
     if (!response.ok) {
@@ -277,12 +283,24 @@ Full HTML length: ${previewHtml.length} characters
     // Auto-enable preview if not already
     if (!previewEnabled) {
       setPreviewEnabled(true);
-      toast.success("Preview sharing enabled for analysis");
+    }
+    
+    // Capture screenshot if available
+    let screenshotBase64: string | null = null;
+    if (onCaptureScreenshot) {
+      toast.info("📸 Capturing preview screenshot...");
+      const result = await onCaptureScreenshot();
+      if (result) {
+        screenshotBase64 = result.base64;
+        toast.success("Screenshot captured!");
+      }
     }
     
     const checkMessage: Message = { 
       role: "user", 
-      content: "Please analyze the current preview and check if the task is complete. Look at the rendered output and tell me:\n1. What has been built so far\n2. Does it look correct and functional?\n3. Are there any issues or improvements needed?\n4. Is the task complete?" 
+      content: screenshotBase64 
+        ? "I've attached a screenshot of the current preview. Please analyze it visually and tell me:\n1. What has been built so far (describe what you see)\n2. Does it look correct and functional?\n3. Are there any visual issues or improvements needed?\n4. Is the task complete?"
+        : "Please analyze the current preview and check if the task is complete. Look at the rendered output and tell me:\n1. What has been built so far\n2. Does it look correct and functional?\n3. Are there any issues or improvements needed?\n4. Is the task complete?" 
     };
     
     const newMessages = [...messages, checkMessage];
@@ -290,7 +308,7 @@ Full HTML length: ${previewHtml.length} characters
     setIsLoading(true);
 
     try {
-      const response = await streamChat(newMessages.filter((m) => m.content));
+      const response = await streamChat(newMessages.filter((m) => m.content), screenshotBase64);
       
       if (response) {
         const generatedFiles = extractCodeBlocks(response);
@@ -486,8 +504,12 @@ Full HTML length: ${previewHtml.length} characters
             size="sm"
             className="w-full gap-2 text-xs border-primary/30 hover:bg-primary/10 hover:border-primary/50"
           >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Check if Complete
+            {onCaptureScreenshot ? (
+              <Camera className="w-3.5 h-3.5" />
+            ) : (
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            )}
+            {onCaptureScreenshot ? "Check with Screenshot" : "Check if Complete"}
           </Button>
         )}
         <div className="flex gap-2">
