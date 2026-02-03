@@ -1,13 +1,21 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera } from "lucide-react";
+import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
 interface Message {
@@ -285,9 +293,9 @@ Full HTML length: ${previewHtml.length} characters
       setPreviewEnabled(true);
     }
     
-    // Capture screenshot if available
+    // Capture screenshot if enabled and available
     let screenshotBase64: string | null = null;
-    if (onCaptureScreenshot) {
+    if (screenshotEnabled && onCaptureScreenshot) {
       toast.info("📸 Capturing preview screenshot...");
       const result = await onCaptureScreenshot();
       if (result) {
@@ -497,20 +505,67 @@ Full HTML length: ${previewHtml.length} characters
       {/* Input */}
       <div className="p-3 border-t border-border space-y-2">
         {previewHtml && (
-          <Button
-            onClick={checkIfComplete}
-            disabled={isLoading}
-            variant="outline"
-            size="sm"
-            className="w-full gap-2 text-xs border-primary/30 hover:bg-primary/10 hover:border-primary/50"
-          >
-            {onCaptureScreenshot ? (
-              <Camera className="w-3.5 h-3.5" />
-            ) : (
-              <CheckCircle2 className="w-3.5 h-3.5" />
+          <div className="space-y-2">
+            {/* Analysis Mode Toggle */}
+            {onCaptureScreenshot && (
+              <TooltipProvider>
+                <div className="flex items-center justify-between px-2 py-1.5 bg-secondary/50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className={`p-1 rounded ${!screenshotEnabled ? 'bg-primary/20 text-primary' : 'text-muted-foreground'}`}>
+                          <FileText className="w-3.5 h-3.5" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <p>Text-based analysis (HTML structure)</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    
+                    <Switch
+                      id="screenshot-mode"
+                      checked={screenshotEnabled}
+                      onCheckedChange={(checked) => {
+                        setScreenshotEnabled(checked);
+                        toast.success(checked ? "Screenshot mode enabled" : "Text mode enabled");
+                      }}
+                      className="data-[state=checked]:bg-primary"
+                    />
+                    
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className={`p-1 rounded ${screenshotEnabled ? 'bg-primary/20 text-primary' : 'text-muted-foreground'}`}>
+                          <Camera className="w-3.5 h-3.5" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <p>Screenshot analysis (visual)</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  
+                  <span className="text-xs text-muted-foreground">
+                    {screenshotEnabled ? "Visual analysis" : "Text analysis"}
+                  </span>
+                </div>
+              </TooltipProvider>
             )}
-            {onCaptureScreenshot ? "Check with Screenshot" : "Check if Complete"}
-          </Button>
+            
+            <Button
+              onClick={checkIfComplete}
+              disabled={isLoading}
+              variant="outline"
+              size="sm"
+              className="w-full gap-2 text-xs border-primary/30 hover:bg-primary/10 hover:border-primary/50"
+            >
+              {screenshotEnabled && onCaptureScreenshot ? (
+                <Camera className="w-3.5 h-3.5" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              )}
+              {screenshotEnabled && onCaptureScreenshot ? "Check with Screenshot" : "Check if Complete"}
+            </Button>
+          </div>
         )}
         <div className="flex gap-2">
           <input
