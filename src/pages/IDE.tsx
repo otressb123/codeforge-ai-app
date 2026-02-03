@@ -230,6 +230,9 @@ const IDE = () => {
       const firstPath = generatedFiles[0].path.startsWith('/') ? generatedFiles[0].path : `/${generatedFiles[0].path}`;
       setActiveFile(firstPath);
     }
+    
+    // Auto-refresh the preview after files are generated
+    setPreviewKey(prev => prev + 1);
   }, []);
 
   const handleSave = useCallback(() => {
