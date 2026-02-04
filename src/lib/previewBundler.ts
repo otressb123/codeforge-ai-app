@@ -133,28 +133,31 @@ const buildModuleSystem = (files: Record<string, string>): string => {
 export const bundlePreview = (files: FileNode[]): string => {
   const flatFiles = flattenFiles(files);
   
-  // Find index.html for pure HTML projects
-  const htmlContent = findFileByName(flatFiles, "index.html");
+  // Collect all CSS
   const globalCss = findFileByName(flatFiles, "index.css") || findFileByName(flatFiles, "styles.css") || findFileByName(flatFiles, "style.css") || "";
   
-  // Check if this is a React project
+  // Check if this is a React project (has App component or entry point)
   const hasApp = findFileByName(flatFiles, "App.tsx") || findFileByName(flatFiles, "App.jsx");
   const hasMain = findFileByName(flatFiles, "main.tsx") || findFileByName(flatFiles, "index.tsx");
   
+  // Always prefer React bundling if we have React components
   if (hasApp || hasMain) {
     return generateReactPreview(flatFiles, globalCss);
   }
   
-  // For pure HTML projects
+  // For pure HTML projects (no React), check for index.html
+  const htmlContent = findFileByName(flatFiles, "index.html");
   if (htmlContent) {
-    let enhanced = htmlContent;
+    // Remove any script tags that try to load from server (they won't work)
+    let enhanced = htmlContent
+      .replace(/<script[^>]*src=["'][^"']*\.(tsx?|jsx?)["'][^>]*><\/script>/gi, '<!-- bundled -->');
     if (globalCss) {
       enhanced = enhanced.replace("</head>", `<style>${globalCss}</style></head>`);
     }
     return enhanced;
   }
   
-  // Fallback
+  // Fallback - show file list
   return generateFileListPreview(Object.keys(flatFiles));
 };
 
