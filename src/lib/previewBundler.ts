@@ -43,6 +43,55 @@ const transpileCode = (code: string, filename: string): string => {
   }
 };
 
+type ImportKind = "named" | "default" | "namespace" | "default+named";
+
+const parseImportClause = (imports: string):
+  | { kind: "named"; named: string }
+  | { kind: "default"; defaultName: string }
+  | { kind: "namespace"; namespaceName: string }
+  | { kind: "default+named"; defaultName: string; named: string }
+  | null => {
+  const trimmed = imports.trim();
+  if (!trimmed) return null;
+
+  // import * as X from '...'
+  const ns = trimmed.match(/^\*\s+as\s+(\w+)$/);
+  if (ns) return { kind: "namespace", namespaceName: ns[1] };
+
+  // import { a, b as c } from '...'
+  if (trimmed.startsWith("{")) {
+    return { kind: "named", named: trimmed };
+  }
+
+  // import Default, { named } from '...'
+  const defaultAndNamed = trimmed.match(/^(\w+)\s*,\s*(\{[\s\S]*\})$/);
+  if (defaultAndNamed) {
+    return { kind: "default+named", defaultName: defaultAndNamed[1], named: defaultAndNamed[2] };
+  }
+
+  // import Default from '...'
+  const def = trimmed.match(/^(\w+)$/);
+  if (def) return { kind: "default", defaultName: def[1] };
+
+  return null;
+};
+
+const buildRequireFromImport = (imports: string, requirePath: string): string => {
+  const parsed = parseImportClause(imports);
+  if (!parsed) return `__require(${JSON.stringify(requirePath)});`;
+
+  switch (parsed.kind) {
+    case "named":
+      return `const ${parsed.named} = __require(${JSON.stringify(requirePath)});`;
+    case "default":
+      return `const { default: ${parsed.defaultName} } = __require(${JSON.stringify(requirePath)});`;
+    case "namespace":
+      return `const ${parsed.namespaceName} = __require(${JSON.stringify(requirePath)});`;
+    case "default+named":
+      return `const __m = __require(${JSON.stringify(requirePath)}); const ${parsed.defaultName} = __m.default; const ${parsed.named} = __m;`;
+  }
+};
+
 // Resolve imports and build a module system
 const buildModuleSystem = (files: Record<string, string>): string => {
   const modules: Record<string, string> = {};
@@ -67,48 +116,53 @@ const buildModuleSystem = (files: Record<string, string>): string => {
       processedCode = processedCode.replace(
         /import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g,
         (match, imports, modulePath) => {
-          // Skip external modules - we'll provide them globally
-          if (!modulePath.startsWith(".") && !modulePath.startsWith("@/") && !modulePath.startsWith("/")) {
-            return `// External: ${match}`;
-          }
-          
-          // Resolve relative path
+          const isInternal = modulePath.startsWith(".") || modulePath.startsWith("@/") || modulePath.startsWith("/");
           let resolvedPath = modulePath;
-          if (modulePath.startsWith("@/")) {
-            resolvedPath = "/src" + modulePath.slice(1);
-          } else if (modulePath.startsWith("./") || modulePath.startsWith("../")) {
-            // Resolve relative to current file
-            const currentDir = normalizedPath.substring(0, normalizedPath.lastIndexOf("/"));
-            const parts = [...currentDir.split("/"), ...modulePath.split("/")];
-            const resolved: string[] = [];
-            for (const part of parts) {
-              if (part === "..") resolved.pop();
-              else if (part !== "." && part !== "") resolved.push(part);
+
+          if (isInternal) {
+            // Resolve relative path
+            if (modulePath.startsWith("@/")) {
+              resolvedPath = "/src" + modulePath.slice(1);
+            } else if (modulePath.startsWith("./") || modulePath.startsWith("../")) {
+              // Resolve relative to current file
+              const currentDir = normalizedPath.substring(0, normalizedPath.lastIndexOf("/"));
+              const parts = [...currentDir.split("/"), ...modulePath.split("/")];
+              const resolved: string[] = [];
+              for (const part of parts) {
+                if (part === "..") resolved.pop();
+                else if (part !== "." && part !== "") resolved.push(part);
+              }
+              resolvedPath = "/" + resolved.join("/");
             }
-            resolvedPath = "/" + resolved.join("/");
-          }
-          
-          // Add extension if missing
-          if (!resolvedPath.match(/\.(js|jsx|ts|tsx|css)$/)) {
-            const extensions = [".tsx", ".ts", ".jsx", ".js", "/index.tsx", "/index.ts"];
-            for (const ext of extensions) {
-              const testPath = resolvedPath + ext;
-              const normalizedTestPath = testPath.startsWith("/") ? testPath.slice(1) : testPath;
-              if (Object.keys(files).some(p => p === normalizedTestPath || p === testPath.slice(1))) {
-                resolvedPath = testPath;
-                break;
+
+            // Add extension if missing
+            if (!resolvedPath.match(/\.(js|jsx|ts|tsx|css)$/)) {
+              const extensions = [".tsx", ".ts", ".jsx", ".js", "/index.tsx", "/index.ts"];
+              for (const ext of extensions) {
+                const testPath = resolvedPath + ext;
+                const normalizedTestPath = testPath.startsWith("/") ? testPath.slice(1) : testPath;
+                if (Object.keys(files).some((p) => p === normalizedTestPath || p === testPath.slice(1))) {
+                  resolvedPath = testPath;
+                  break;
+                }
               }
             }
+
+            // Handle CSS imports
+            if (resolvedPath.endsWith(".css")) {
+              return `// CSS import: ${modulePath}`;
+            }
           }
-          
-          // Handle CSS imports
-          if (resolvedPath.endsWith(".css")) {
-            return `// CSS import: ${modulePath}`;
-          }
-          
-          return `const ${imports.includes("{") ? imports : `{ default: ${imports.trim()} }`} = __require("${resolvedPath}")`;
+
+          return buildRequireFromImport(imports, resolvedPath);
         }
       );
+
+      // Transform side-effect imports: import 'x';
+      processedCode = processedCode.replace(/import\s+['"]([^'"]+)['"];?/g, (_, modulePath) => {
+        if (String(modulePath).endsWith(".css")) return `// CSS import: ${modulePath}`;
+        return `__require(${JSON.stringify(String(modulePath))});`;
+      });
       
       // Transform exports
       processedCode = processedCode.replace(/export\s+default\s+/g, "__exports.default = ");
@@ -205,7 +259,7 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
 <body>
   <div id="root"></div>
   
-  <script>
+   <script>
     // Console capture for parent frame
     (function() {
       const originalLog = console.log;
@@ -229,13 +283,93 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
     // Module system
     const __modules = ${modulesJson};
     const __cache = {};
+
+     // External module shims (keeps previews from crashing on common libs)
+     function __createExternalStub(moduleName) {
+       const stubFn = function() { console.warn('External module stub called:', moduleName); return null; };
+       const base = { __esModule: true };
+       // Default export is callable (works as function OR component)
+       (base).default = stubFn;
+       return new Proxy(base, {
+         get: (target, prop) => {
+           if (prop in target) return target[prop];
+           if (prop === '__esModule') return true;
+           if (prop === 'default') return stubFn;
+           return stubFn;
+         }
+       });
+     }
+
+     function __createLucideIcon(name) {
+       return function LucideIcon(props) {
+         const size = (props && (props.size || props.width || props.height)) || 24;
+         const { color, strokeWidth, children, ...rest } = (props || {});
+         return React.createElement(
+           'svg',
+           {
+             width: size,
+             height: size,
+             viewBox: '0 0 24 24',
+             fill: 'none',
+             stroke: color || 'currentColor',
+             strokeWidth: strokeWidth || 2,
+             strokeLinecap: 'round',
+             strokeLinejoin: 'round',
+             ...rest,
+           },
+           React.createElement('title', null, name),
+           // simple placeholder glyph
+           React.createElement('rect', { x: 4, y: 4, width: 16, height: 16, rx: 3 }),
+           children
+         );
+       };
+     }
+
+     const __lucideBase = { __esModule: true };
+     const __lucide = new Proxy(__lucideBase, {
+       get: (target, prop) => {
+         if (prop in target) return target[prop];
+         if (prop === 'default') return __lucide;
+         if (prop === '__esModule') return true;
+         return __createLucideIcon(String(prop));
+       }
+     });
+     (__lucideBase).default = __lucide;
+
+     const __motion = new Proxy({}, {
+       get: (_, tag) => {
+         const el = String(tag);
+         return function MotionElement(props) {
+           const {
+             initial, animate, exit, transition, variants,
+             whileHover, whileTap, whileFocus, whileInView,
+             layout, layoutId,
+             children,
+             ...rest
+           } = (props || {});
+           return React.createElement(el, rest, children);
+         };
+       }
+     });
     
     function __require(path) {
-      // Handle external modules
-      if (path === 'react' || path === 'React') return { default: React, ...React };
-      if (path === 'react-dom' || path === 'react-dom/client') {
-        return { default: ReactDOM, createRoot: ReactDOM.createRoot };
-      }
+       // Handle external modules
+       if (path === 'react' || path === 'React') return { default: React, ...React };
+       if (path === 'react-dom' || path === 'react-dom/client') {
+         return { default: ReactDOM, createRoot: ReactDOM.createRoot };
+       }
+       if (path === 'lucide-react') return __lucide;
+       if (path === 'framer-motion') {
+         return {
+           __esModule: true,
+           motion: __motion,
+           AnimatePresence: ({ children }) => React.createElement(React.Fragment, null, children),
+         };
+       }
+       // Generic external fallback
+       if (typeof path === 'string' && !path.startsWith('/')) {
+         return __createExternalStub(path);
+       }
       
       // Normalize path
       let normalizedPath = path;
