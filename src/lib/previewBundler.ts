@@ -1,5 +1,6 @@
 import { FileNode } from "@/components/FileExplorer";
 import * as Babel from "@babel/standalone";
+import { autoFixMissingImports } from "@/lib/autoFixImports";
 
 // Flatten file tree to a map of path -> content
 export const flattenFiles = (nodes: FileNode[], basePath = ""): Record<string, string> => {
@@ -102,8 +103,8 @@ const buildModuleSystem = (files: Record<string, string>): string => {
       // Normalize path
       const normalizedPath = path.startsWith("/") ? path : `/${path}`;
       
-      // Process imports to use our module system
-      let processedCode = content;
+      // Auto-fix missing imports (e.g. lucide-react icons) before processing
+      let processedCode = autoFixMissingImports(content);
       
       // Remove type-only imports (TypeScript)
       processedCode = processedCode.replace(/import\s+type\s+.*?;/g, "");
