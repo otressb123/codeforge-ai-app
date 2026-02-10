@@ -149,3 +149,13 @@
     50% { background-position: 100% 50%; }
   }
 }
+
+/* Monaco editor auto-fix glyph indicator */
+.auto-fix-glyph {
+  background: hsl(187 100% 50% / 0.8);
+  border-radius: 50%;
+  width: 6px !important;
+  height: 6px !important;
+  margin-left: 4px;
+  margin-top: 8px;
+}
