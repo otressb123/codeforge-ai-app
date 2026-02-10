@@ -1,7 +1,7 @@
 import Editor, { OnMount, BeforeMount } from "@monaco-editor/react";
 import { Loader2, AlertCircle, AlertTriangle, Info, Wand2 } from "lucide-react";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { detectMissingLucideImports } from "@/lib/autoFixImports";
+import { detectMissingLucideImports, detectMissingFramerMotionImports } from "@/lib/autoFixImports";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CodeEditorProps {
@@ -43,6 +43,7 @@ const getLanguage = (filename: string): string => {
 const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
   const [diagnostics, setDiagnostics] = useState<DiagnosticCounts>({ errors: 0, warnings: 0, info: 0 });
   const [autoFixedIcons, setAutoFixedIcons] = useState<string[]>([]);
+  const [autoFixedFramer, setAutoFixedFramer] = useState<string[]>([]);
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
   const decorationsRef = useRef<any>(null);
@@ -50,10 +51,11 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
   // Detect auto-fixed imports whenever content changes
   useEffect(() => {
     if (language === "typescriptreact" || language === "typescript" || language === "javascriptreact" || language === "javascript") {
-      const missing = detectMissingLucideImports(content);
-      setAutoFixedIcons(missing);
+      setAutoFixedIcons(detectMissingLucideImports(content));
+      setAutoFixedFramer(detectMissingFramerMotionImports(content));
     } else {
       setAutoFixedIcons([]);
+      setAutoFixedFramer([]);
     }
   }, [content, language]);
 
@@ -61,7 +63,8 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
   useEffect(() => {
     const editor = editorRef.current;
     const monaco = monacoRef.current;
-    if (!editor || !monaco || autoFixedIcons.length === 0) {
+    const allFixed = [...autoFixedIcons, ...autoFixedFramer];
+    if (!editor || !monaco || allFixed.length === 0) {
       if (editor && decorationsRef.current) {
         decorationsRef.current.clear();
         decorationsRef.current = null;
@@ -77,19 +80,20 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
 
     for (let lineNum = 1; lineNum <= lineCount; lineNum++) {
       const lineContent = model.getLineContent(lineNum);
-      for (const icon of autoFixedIcons) {
-        const re = new RegExp(`<${icon}[\\s/>]`);
+      for (const name of allFixed) {
+        const re = new RegExp(`(?:<${name}[\\s/>]|\\b${name}[.(\\b])`);
         if (re.test(lineContent)) {
+          const lib = autoFixedIcons.includes(name) ? 'lucide-react' : 'framer-motion';
           decorations.push({
             range: new monaco.Range(lineNum, 1, lineNum, 1),
             options: {
               isWholeLine: false,
               glyphMarginClassName: "auto-fix-glyph",
-              glyphMarginHoverMessage: { value: `⚡ **${icon}** will be auto-imported from \`lucide-react\`` },
+              glyphMarginHoverMessage: { value: `⚡ **${name}** will be auto-imported from \`${lib}\`` },
               afterContentClassName: "auto-fix-after",
             },
           });
-          break; // one decoration per line
+          break;
         }
       }
     }
@@ -98,7 +102,7 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
       decorationsRef.current.clear();
     }
     decorationsRef.current = editor.createDecorationsCollection(decorations);
-  }, [autoFixedIcons, content]);
+  }, [autoFixedIcons, autoFixedFramer, content]);
 
   const handleBeforeMount: BeforeMount = (monaco) => {
     // Configure TypeScript/JavaScript compiler options for JSX support
@@ -216,6 +220,7 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
     };
   }, []);
 
+  const totalAutoFixes = autoFixedIcons.length + autoFixedFramer.length;
   const totalIssues = diagnostics.errors + diagnostics.warnings + diagnostics.info;
 
   return (
@@ -283,30 +288,35 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
               {diagnostics.info}
             </span>
           )}
-          {totalIssues === 0 && autoFixedIcons.length === 0 && (
-            <span className="text-success flex items-center gap-1">
-              ✓ No problems
-            </span>
-          )}
-          {totalIssues === 0 && autoFixedIcons.length > 0 && (
+          {totalIssues === 0 && (
             <span className="text-success flex items-center gap-1">
               ✓ No problems
             </span>
           )}
         </div>
         <div className="flex items-center gap-3">
-          {autoFixedIcons.length > 0 && (
+          {totalAutoFixes > 0 && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="flex items-center gap-1 text-primary cursor-help">
                     <Wand2 className="w-3 h-3" />
-                    {autoFixedIcons.length} auto-import{autoFixedIcons.length > 1 ? 's' : ''}
+                    {totalAutoFixes} auto-import{totalAutoFixes > 1 ? 's' : ''}
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
-                  <p className="font-medium mb-1">Auto-imported from lucide-react:</p>
-                  <p className="text-muted-foreground">{autoFixedIcons.join(', ')}</p>
+                  {autoFixedIcons.length > 0 && (
+                    <div className="mb-1">
+                      <p className="font-medium">lucide-react:</p>
+                      <p className="text-muted-foreground">{autoFixedIcons.join(', ')}</p>
+                    </div>
+                  )}
+                  {autoFixedFramer.length > 0 && (
+                    <div>
+                      <p className="font-medium">framer-motion:</p>
+                      <p className="text-muted-foreground">{autoFixedFramer.join(', ')}</p>
+                    </div>
+                  )}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
