@@ -1,6 +1,8 @@
 import Editor, { OnMount, BeforeMount } from "@monaco-editor/react";
-import { Loader2, AlertCircle, AlertTriangle, Info } from "lucide-react";
-import { useState, useCallback } from "react";
+import { Loader2, AlertCircle, AlertTriangle, Info, Wand2 } from "lucide-react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { detectMissingLucideImports } from "@/lib/autoFixImports";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CodeEditorProps {
   content: string;
@@ -40,6 +42,63 @@ const getLanguage = (filename: string): string => {
 
 const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
   const [diagnostics, setDiagnostics] = useState<DiagnosticCounts>({ errors: 0, warnings: 0, info: 0 });
+  const [autoFixedIcons, setAutoFixedIcons] = useState<string[]>([]);
+  const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
+  const decorationsRef = useRef<any>(null);
+
+  // Detect auto-fixed imports whenever content changes
+  useEffect(() => {
+    if (language === "typescriptreact" || language === "typescript" || language === "javascriptreact" || language === "javascript") {
+      const missing = detectMissingLucideImports(content);
+      setAutoFixedIcons(missing);
+    } else {
+      setAutoFixedIcons([]);
+    }
+  }, [content, language]);
+
+  // Apply Monaco decorations for auto-fixed icon usages
+  useEffect(() => {
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!editor || !monaco || autoFixedIcons.length === 0) {
+      if (editor && decorationsRef.current) {
+        decorationsRef.current.clear();
+        decorationsRef.current = null;
+      }
+      return;
+    }
+
+    const model = editor.getModel();
+    if (!model) return;
+
+    const decorations: any[] = [];
+    const lineCount = model.getLineCount();
+
+    for (let lineNum = 1; lineNum <= lineCount; lineNum++) {
+      const lineContent = model.getLineContent(lineNum);
+      for (const icon of autoFixedIcons) {
+        const re = new RegExp(`<${icon}[\\s/>]`);
+        if (re.test(lineContent)) {
+          decorations.push({
+            range: new monaco.Range(lineNum, 1, lineNum, 1),
+            options: {
+              isWholeLine: false,
+              glyphMarginClassName: "auto-fix-glyph",
+              glyphMarginHoverMessage: { value: `⚡ **${icon}** will be auto-imported from \`lucide-react\`` },
+              afterContentClassName: "auto-fix-after",
+            },
+          });
+          break; // one decoration per line
+        }
+      }
+    }
+
+    if (decorationsRef.current) {
+      decorationsRef.current.clear();
+    }
+    decorationsRef.current = editor.createDecorationsCollection(decorations);
+  }, [autoFixedIcons, content]);
 
   const handleBeforeMount: BeforeMount = (monaco) => {
     // Configure TypeScript/JavaScript compiler options for JSX support
@@ -106,6 +165,8 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
   };
 
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
 
     // Listen for model markers (diagnostics) changes
     const updateDiagnostics = () => {
@@ -190,15 +251,13 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
             autoClosingQuotes: "always",
             formatOnPaste: true,
             formatOnType: true,
-            // Enable inline hints and diagnostics
             inlayHints: { enabled: "on" },
             quickSuggestions: true,
             suggestOnTriggerCharacters: true,
             parameterHints: { enabled: true },
-            // Show lightbulb for quick fixes
             lightbulb: { enabled: "on" },
-            // Show squiggly lines for errors
             renderValidationDecorations: "on",
+            glyphMargin: true,
           }}
         />
       </div>
@@ -224,13 +283,36 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
               {diagnostics.info}
             </span>
           )}
-          {totalIssues === 0 && (
+          {totalIssues === 0 && autoFixedIcons.length === 0 && (
+            <span className="text-success flex items-center gap-1">
+              ✓ No problems
+            </span>
+          )}
+          {totalIssues === 0 && autoFixedIcons.length > 0 && (
             <span className="text-success flex items-center gap-1">
               ✓ No problems
             </span>
           )}
         </div>
-        <span className="text-muted-foreground">{language}</span>
+        <div className="flex items-center gap-3">
+          {autoFixedIcons.length > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex items-center gap-1 text-primary cursor-help">
+                    <Wand2 className="w-3 h-3" />
+                    {autoFixedIcons.length} auto-import{autoFixedIcons.length > 1 ? 's' : ''}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="font-medium mb-1">Auto-imported from lucide-react:</p>
+                  <p className="text-muted-foreground">{autoFixedIcons.join(', ')}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          <span className="text-muted-foreground">{language}</span>
+        </div>
       </div>
     </div>
   );
