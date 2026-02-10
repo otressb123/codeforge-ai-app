@@ -240,6 +240,21 @@ const LUCIDE_ICONS = new Set([
   "XOctagon","XSquare","Youtube","Zap","ZapOff","ZoomIn","ZoomOut",
 ]);
 
+// Known framer-motion exports
+const FRAMER_MOTION_EXPORTS = new Set([
+  // Core
+  "motion","AnimatePresence","LayoutGroup","LazyMotion","MotionConfig",
+  "Reorder","DragControls",
+  // Hooks
+  "useAnimation","useMotionValue","useTransform","useSpring","useVelocity",
+  "useScroll","useInView","useAnimationFrame","useMotionTemplate",
+  "useDragControls","useReducedMotion","useTime","useWillChange",
+  // Utilities
+  "animate","stagger","cubicBezier","easeIn","easeInOut","easeOut",
+  "circIn","circInOut","circOut","backIn","backInOut","backOut",
+  "anticipate","spring",
+]);
+
 // Identifiers to never auto-import (built-ins, React, HTML, etc.)
 const IGNORE_IDENTIFIERS = new Set([
   // React built-ins
@@ -250,8 +265,6 @@ const IGNORE_IDENTIFIERS = new Set([
   "Outlet","Navigate","BrowserRouter","HashRouter","MemoryRouter",
   // HTML-like but PascalCase (custom components the user likely defines)
   "Header","Footer","Main","Section","Nav","Aside","Article",
-  // Animation
-  "AnimatePresence","MotionDiv",
 ]);
 
 /**
@@ -260,9 +273,6 @@ const IGNORE_IDENTIFIERS = new Set([
  * imported from lucide-react.
  */
 export function detectMissingLucideImports(code: string): string[] {
-  // 1. Collect all PascalCase identifiers used as JSX elements
-  //    Matches: <IconName, <IconName>, <IconName />, <IconName\
-
   const jsxUsageRe = /<([A-Z][A-Za-z0-9]+)[\s/>]/g;
   const usedComponents = new Set<string>();
   let m: RegExpExecArray | null;
@@ -272,37 +282,8 @@ export function detectMissingLucideImports(code: string): string[] {
 
   if (usedComponents.size === 0) return [];
 
-  // 2. Collect already-imported identifiers
-  const importedNames = new Set<string>();
-  // Named imports:  import { A, B as C } from '...'
-  const namedImportRe = /import\s*\{([^}]+)\}\s*from\s*['"][^'"]+['"]/g;
-  while ((m = namedImportRe.exec(code)) !== null) {
-    const names = m[1].split(",").map((n) => {
-      const parts = n.trim().split(/\s+as\s+/);
-      return (parts[1] || parts[0]).trim();
-    });
-    names.forEach((n) => n && importedNames.add(n));
-  }
-  // Default imports:  import Foo from '...'
-  const defaultImportRe = /import\s+([A-Z]\w+)\s+from\s*['"][^'"]+['"]/g;
-  while ((m = defaultImportRe.exec(code)) !== null) {
-    importedNames.add(m[1]);
-  }
-  // Namespace imports: import * as Foo from '...'
-  const nsImportRe = /import\s*\*\s*as\s+(\w+)\s+from\s*['"][^'"]+['"]/g;
-  while ((m = nsImportRe.exec(code)) !== null) {
-    importedNames.add(m[1]);
-  }
+  const importedNames = collectImportedNames(code);
 
-  // 3. Collect locally-defined PascalCase identifiers
-  //    const Foo = ..., function Foo(...), class Foo
-  const localDefRe = /(?:const|let|var|function|class)\s+([A-Z]\w+)/g;
-  while ((m = localDefRe.exec(code)) !== null) {
-    importedNames.add(m[1]);
-  }
-
-  // 4. Filter: keep only icons that are used, not already imported,
-  //    not in the ignore list, and ARE in the Lucide set.
   const missing: string[] = [];
   for (const name of usedComponents) {
     if (importedNames.has(name)) continue;
@@ -316,30 +297,94 @@ export function detectMissingLucideImports(code: string): string[] {
 }
 
 /**
- * Given source code, detect missing lucide-react icon imports and prepend
- * the import statement.  Returns the (possibly modified) code.
+ * Detect missing framer-motion imports.
+ * Looks for both JSX usage (<AnimatePresence>, <LayoutGroup>) and
+ * property/call usage (motion.div, useAnimation(), animate()).
  */
-export function autoFixMissingImports(code: string): string {
-  const missing = detectMissingLucideImports(code);
-  if (missing.length === 0) return code;
+export function detectMissingFramerMotionImports(code: string): string[] {
+  const importedNames = collectImportedNames(code);
+  const missing: string[] = [];
 
-  // Check if there's already a lucide-react import we can extend
-  const existingLucideImport = code.match(
-    /import\s*\{([^}]+)\}\s*from\s*['"]lucide-react['"]/
-  );
+  for (const name of FRAMER_MOTION_EXPORTS) {
+    if (importedNames.has(name)) continue;
 
-  if (existingLucideImport) {
-    // Extend the existing import
-    const existingNames = existingLucideImport[1]
-      .split(",")
-      .map((n) => n.trim())
-      .filter(Boolean);
-    const allNames = [...new Set([...existingNames, ...missing])].sort();
-    const newImport = `import { ${allNames.join(", ")} } from 'lucide-react'`;
-    return code.replace(existingLucideImport[0], newImport);
+    // Check JSX usage: <AnimatePresence, <LayoutGroup, <Reorder
+    const jsxRe = new RegExp(`<${name}[\\s/>]`);
+    // Check call/property usage: motion.div, useAnimation(, animate(
+    const callRe = new RegExp(`\\b${name}[.(]`);
+    // Check plain reference: e.g. passing as prop
+    const refRe = new RegExp(`\\b${name}\\b`);
+
+    if (jsxRe.test(code) || callRe.test(code) || refRe.test(code)) {
+      missing.push(name);
+    }
   }
 
-  // Prepend a new import
-  const importLine = `import { ${missing.join(", ")} } from 'lucide-react';\n`;
-  return importLine + code;
+  return missing.sort();
+}
+
+/** Collect all already-imported and locally-defined identifiers */
+function collectImportedNames(code: string): Set<string> {
+  const importedNames = new Set<string>();
+  let m: RegExpExecArray | null;
+
+  const namedImportRe = /import\s*\{([^}]+)\}\s*from\s*['"][^'"]+['"]/g;
+  while ((m = namedImportRe.exec(code)) !== null) {
+    m[1].split(",").forEach((n) => {
+      const parts = n.trim().split(/\s+as\s+/);
+      const name = (parts[1] || parts[0]).trim();
+      if (name) importedNames.add(name);
+    });
+  }
+  const defaultImportRe = /import\s+([A-Za-z]\w+)\s+from\s*['"][^'"]+['"]/g;
+  while ((m = defaultImportRe.exec(code)) !== null) {
+    importedNames.add(m[1]);
+  }
+  const nsImportRe = /import\s*\*\s*as\s+(\w+)\s+from\s*['"][^'"]+['"]/g;
+  while ((m = nsImportRe.exec(code)) !== null) {
+    importedNames.add(m[1]);
+  }
+  const localDefRe = /(?:const|let|var|function|class)\s+([A-Z]\w+)/g;
+  while ((m = localDefRe.exec(code)) !== null) {
+    importedNames.add(m[1]);
+  }
+
+  return importedNames;
+}
+
+/**
+ * Given source code, detect missing lucide-react and framer-motion imports
+ * and inject them.  Returns the (possibly modified) code.
+ */
+export function autoFixMissingImports(code: string): string {
+  let result = code;
+
+  // Fix lucide-react
+  const missingLucide = detectMissingLucideImports(result);
+  if (missingLucide.length > 0) {
+    result = injectImport(result, 'lucide-react', missingLucide);
+  }
+
+  // Fix framer-motion
+  const missingFramer = detectMissingFramerMotionImports(result);
+  if (missingFramer.length > 0) {
+    result = injectImport(result, 'framer-motion', missingFramer);
+  }
+
+  return result;
+}
+
+/** Inject or extend a named import for a given module. */
+function injectImport(code: string, module: string, names: string[]): string {
+  const escaped = module.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const existingRe = new RegExp(`import\\s*\\{([^}]+)\\}\\s*from\\s*['"]${escaped}['"]`);
+  const existing = code.match(existingRe);
+
+  if (existing) {
+    const existingNames = existing[1].split(",").map((n) => n.trim()).filter(Boolean);
+    const allNames = [...new Set([...existingNames, ...names])].sort();
+    return code.replace(existing[0], `import { ${allNames.join(", ")} } from '${module}'`);
+  }
+
+  return `import { ${names.join(", ")} } from '${module}';\n` + code;
 }
