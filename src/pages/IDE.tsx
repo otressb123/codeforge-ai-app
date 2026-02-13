@@ -406,6 +406,7 @@ const IDE = () => {
   const currentFile = openFiles.find((f) => f.path === activeFile);
 
   // Generate preview HTML from files (including file system for auto-generated files)
+  // Returns HTML only for pure HTML projects; returns null for React projects so the bundler handles them
   const getPreviewHtml = useCallback(() => {
     // Helper to find file in file tree
     const findFileInTree = (nodes: FileNode[], fileName: string): FileNode | null => {
@@ -419,6 +420,16 @@ const IDE = () => {
       return null;
     };
 
+    // Check if this is a React project (has App.tsx/jsx or main.tsx/jsx)
+    const hasReactFiles = ['App.tsx', 'App.jsx', 'main.tsx', 'index.tsx'].some(name => {
+      const inOpen = openFiles.some(f => f.name === name);
+      const inTree = findFileInTree(files, name) !== null;
+      return inOpen || inTree;
+    });
+
+    // For React projects, return null so PreviewPanel uses the bundler with the files prop
+    if (hasReactFiles) return null;
+
     // First check open files, then fall back to file tree
     const getFileContent = (fileName: string): string | null => {
       const openFile = openFiles.find(f => f.name === fileName);
@@ -427,13 +438,12 @@ const IDE = () => {
       return treeFile?.content || null;
     };
 
-    // Find index.html
+    // Find index.html for pure HTML projects
     const htmlContent = getFileContent("index.html");
     const cssContent = getFileContent("styles.css") || getFileContent("style.css");
     
     if (htmlContent) {
       let html = htmlContent;
-      // Inject CSS if available
       if (cssContent) {
         html = html.replace('</head>', `<style>${cssContent}</style></head>`);
       }
