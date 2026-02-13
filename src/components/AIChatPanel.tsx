@@ -50,15 +50,15 @@ const AIChatPanel = ({ onCodeGenerated, onFilesGenerated, previewHtml, onCapture
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "👋 Hi! I'm your AI coding agent - just like Cursor!\n\nTell me what to build and I'll **automatically generate all the files** for your project.\n\n💡 **Tip:** Click the 👁️ button to share the preview with me so I can see what's rendered!\n\nExamples:\n• \"Build me a landing page for a SaaS product\"\n• \"Create a todo app with local storage\"\n• \"Make a portfolio website\"\n\nWhat would you like me to build?",
+      content: "👋 Hi! I'm your AI coding agent - just like Cursor!\n\nTell me what to build and I'll **automatically generate all the files** for your project. Preview sharing and auto-refresh are **enabled by default** — I can always see what's rendered!\n\nExamples:\n• \"Build me a landing page for a SaaS product\"\n• \"Create a todo app with local storage\"\n• \"Make a portfolio website\"\n\nWhat would you like me to build?",
     },
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [selectedModel, setSelectedModel] = useState(AI_MODELS[0]);
-  const [previewEnabled, setPreviewEnabled] = useState(false);
-  const [screenshotEnabled, setScreenshotEnabled] = useState(false);
+  const [previewEnabled, setPreviewEnabled] = useState(true);
+  const [screenshotEnabled, setScreenshotEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {

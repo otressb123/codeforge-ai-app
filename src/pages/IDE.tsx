@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import TopBar from "@/components/TopBar";
 import ActivityBar from "@/components/ActivityBar";
@@ -57,7 +57,7 @@ const initialFiles: FileNode[] = [
 ];
 
 const IDE = () => {
-  const [activeTab, setActiveTab] = useState<SidebarTab>("files");
+  const [activeTab, setActiveTab] = useState<SidebarTab>("ai");
   const [files, setFiles] = useState<FileNode[]>(initialFiles);
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
   const [activeFile, setActiveFile] = useState<string | null>(null);
@@ -135,6 +135,18 @@ const IDE = () => {
       prev.map((f) => (f.path === activeFile ? { ...f, content: value, isModified: true } : f))
     );
   }, [activeFile]);
+
+  // Auto-refresh preview when code changes (debounced)
+  const autoRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (autoRefreshTimer.current) clearTimeout(autoRefreshTimer.current);
+    autoRefreshTimer.current = setTimeout(() => {
+      setPreviewKey(prev => prev + 1);
+    }, 1000);
+    return () => {
+      if (autoRefreshTimer.current) clearTimeout(autoRefreshTimer.current);
+    };
+  }, [openFiles]);
 
   // Handle AI-generated code - add to editor
   const handleAICodeGenerated = useCallback((code: string, filename: string) => {
