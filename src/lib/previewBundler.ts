@@ -117,6 +117,36 @@ const buildModuleSystem = (files: Record<string, string>): string => {
       processedCode = processedCode.replace(
         /import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g,
         (match, imports, modulePath) => {
+          // Handle react/react-dom imports — they're already globals via CDN and function params
+          if (modulePath === 'react' || modulePath === 'React') {
+            const parsed = parseImportClause(imports.trim());
+            if (!parsed) return `// ${match} (provided as global)`;
+            switch (parsed.kind) {
+              case 'default':
+                return `// ${parsed.defaultName} already global`;
+              case 'named':
+                return `const ${parsed.named} = React;`;
+              case 'namespace':
+                return `const ${parsed.namespaceName} = React;`;
+              case 'default+named':
+                return `const ${parsed.named} = React;`;
+            }
+          }
+          if (modulePath === 'react-dom' || modulePath === 'react-dom/client') {
+            const parsed = parseImportClause(imports.trim());
+            if (!parsed) return `// ${match} (provided as global)`;
+            switch (parsed.kind) {
+              case 'default':
+                return `// ${parsed.defaultName} already global`;
+              case 'named':
+                return `const ${parsed.named} = ReactDOM;`;
+              case 'namespace':
+                return `const ${parsed.namespaceName} = ReactDOM;`;
+              case 'default+named':
+                return `const ${parsed.named} = ReactDOM;`;
+            }
+          }
+
           const isInternal = modulePath.startsWith(".") || modulePath.startsWith("@/") || modulePath.startsWith("/");
           let resolvedPath = modulePath;
 
@@ -418,10 +448,7 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
     
     // Boot the app
     try {
-      // Try to find and render the App
-      let App;
-      
-      // Try main entry points
+      // Try main entry points first (they typically call createRoot themselves)
       const entryPoints = ['/src/main.tsx', '/src/index.tsx', '/src/main.jsx', '/src/index.jsx', '/main.tsx', '/index.tsx'];
       let mainModule = null;
       
@@ -432,22 +459,28 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
         }
       }
       
-      // If main didn't render, try App directly
-      const appPaths = ['/src/App.tsx', '/src/App.jsx', '/App.tsx', '/App.jsx'];
-      for (const appPath of appPaths) {
-        if (__modules[appPath]) {
-          App = __require(appPath).default;
-          break;
+      // If main entry rendered the app, we're done
+      if (mainModule && document.getElementById('root').hasChildNodes()) {
+        // App was rendered by the entry point
+      } else {
+        // Fallback: try App directly
+        let App;
+        const appPaths = ['/src/App.tsx', '/src/App.jsx', '/App.tsx', '/App.jsx'];
+        for (const appPath of appPaths) {
+          if (__modules[appPath]) {
+            App = __require(appPath).default;
+            break;
+          }
         }
-      }
-      
-      if (App && !document.getElementById('root').hasChildNodes()) {
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(React.createElement(App));
-      }
-      
-      if (!App && !mainModule) {
-        document.getElementById('root').innerHTML = '<div class="preview-error">No App component found. Make sure you have App.tsx or main.tsx in your project.</div>';
+        
+        if (App && !document.getElementById('root').hasChildNodes()) {
+          const root = ReactDOM.createRoot(document.getElementById('root'));
+          root.render(React.createElement(App));
+        }
+        
+        if (!App && !mainModule) {
+          document.getElementById('root').innerHTML = '<div class="preview-error">No App component found. Make sure you have App.tsx or main.tsx in your project.</div>';
+        }
       }
     } catch (error) {
       console.error('Render error:', error);
