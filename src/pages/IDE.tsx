@@ -373,20 +373,6 @@ const IDE = () => {
     toast.success(`Created folder ${folderName}`);
   }, []);
 
-  const handleUploadFile = useCallback((parentPath: string, fileName: string, content: string) => {
-    const pathParts = parentPath.split("/").filter(Boolean);
-    const newFile: FileNode = {
-      name: fileName,
-      type: "file",
-      content,
-    };
-    setFiles((prev) => addNodeToPath(prev, pathParts, newFile));
-    
-    const fullPath = parentPath ? `${parentPath}/${fileName}` : `/${fileName}`;
-    setOpenFiles((prev) => [...prev, { path: fullPath, name: fileName, content, isModified: false }]);
-    setActiveFile(fullPath);
-  }, []);
-
   const handleDeleteNode = useCallback((nodePath: string) => {
     const pathParts = nodePath.split("/").filter(Boolean);
     setFiles((prev) => removeNodeFromPath(prev, pathParts));
@@ -489,7 +475,6 @@ const IDE = () => {
             onCreateFolder={handleCreateFolder}
             onDeleteNode={handleDeleteNode}
             onRenameNode={handleRenameNode}
-            onUploadFile={handleUploadFile}
           />
         );
       case "search":

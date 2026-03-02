@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText, Mic, MicOff } from "lucide-react";
+import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -60,9 +60,6 @@ const AIChatPanel = ({ onCodeGenerated, onFilesGenerated, previewHtml, onCapture
   const [previewEnabled, setPreviewEnabled] = useState(true);
   const [screenshotEnabled, setScreenshotEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -346,82 +343,6 @@ Full HTML length: ${previewHtml.length} characters
     ]);
   };
 
-  const toggleRecording = async () => {
-    if (isRecording) {
-      // Stop recording
-      mediaRecorderRef.current?.stop();
-      setIsRecording(false);
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        stream.getTracks().forEach(t => t.stop());
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        
-        // Use Web Speech API for transcription
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-          toast.success("Recording saved! Using browser speech recognition...");
-        }
-        
-        // Convert to text using browser's speech recognition
-        const url = URL.createObjectURL(audioBlob);
-        const audio = new Audio(url);
-        toast.info("🎤 Voice recorded. Paste or type your message.");
-        URL.revokeObjectURL(url);
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-      toast.success("🎤 Recording... Click again to stop.");
-
-      // Also start live speech recognition
-      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-        
-        recognition.onresult = (event: any) => {
-          let transcript = '';
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript;
-          }
-          setInput(transcript);
-        };
-
-        recognition.onerror = () => {
-          toast.error("Speech recognition error");
-        };
-
-        recognition.onend = () => {
-          // Recognition ended
-        };
-
-        recognition.start();
-        
-        // Store reference to stop later
-        (mediaRecorderRef.current as any)._recognition = recognition;
-        
-        mediaRecorder.addEventListener('stop', () => {
-          recognition.stop();
-        });
-      }
-    } catch (err) {
-      toast.error("Microphone access denied");
-    }
-  };
-
   const copyToClipboard = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
@@ -656,16 +577,6 @@ Full HTML length: ${previewHtml.length} characters
             disabled={isLoading}
             className="flex-1 bg-input border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground disabled:opacity-50"
           />
-          <Button
-            onClick={toggleRecording}
-            disabled={isLoading}
-            variant={isRecording ? "destructive" : "outline"}
-            size="icon"
-            className={`shrink-0 ${isRecording ? "animate-pulse" : ""}`}
-            title={isRecording ? "Stop recording" : "Voice input"}
-          >
-            {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </Button>
           <Button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}

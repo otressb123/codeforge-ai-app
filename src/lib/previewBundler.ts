@@ -198,19 +198,11 @@ const buildModuleSystem = (files: Record<string, string>): string => {
       // Transform exports (only outside string literals)
       // First, protect string literals by replacing them with placeholders
       const strings: string[] = [];
-      // Handle single and double quoted strings
-      processedCode = processedCode.replace(/(["'])(?:(?!\1|\\).|\\.)*?\1/g, (match) => {
-        strings.push(match);
-        return `__STR_${strings.length - 1}__`;
-      });
-      // Handle template literals (backticks) separately since they can be multiline
-      processedCode = processedCode.replace(/`(?:[^`\\]|\\.|\$\{(?:[^{}]|\{[^}]*\})*\})*`/gs, (match) => {
+      processedCode = processedCode.replace(/(["'`])(?:(?!\1|\\).|\\.)*?\1/g, (match) => {
         strings.push(match);
         return `__STR_${strings.length - 1}__`;
       });
       
-      // Handle "export default function Name" and "export default class Name"
-      processedCode = processedCode.replace(/export\s+default\s+(function|class)\s+(\w+)/g, "$1 $2; __exports.default = $2");
       processedCode = processedCode.replace(/export\s+default\s+/g, "__exports.default = ");
       processedCode = processedCode.replace(/export\s+(const|let|var|function|class)\s+(\w+)/g, "$1 $2; __exports.$2 = $2");
       processedCode = processedCode.replace(/export\s*\{([^}]+)\}/g, (_, exports) => {

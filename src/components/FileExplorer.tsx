@@ -1,4 +1,4 @@
-import { FileCode, Folder, FolderOpen, ChevronRight, ChevronDown, File, FileJson, FileType, Image, Plus, FilePlus, FolderPlus, Trash2, Pencil, Upload } from "lucide-react";
+import { FileCode, Folder, FolderOpen, ChevronRight, ChevronDown, File, FileJson, FileType, Image, Plus, FilePlus, FolderPlus, Trash2, Pencil } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -9,7 +9,6 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
 
 export interface FileNode {
   name: string;
@@ -26,7 +25,6 @@ interface FileExplorerProps {
   onCreateFolder?: (path: string, name: string) => void;
   onDeleteNode?: (path: string) => void;
   onRenameNode?: (path: string, newName: string) => void;
-  onUploadFile?: (path: string, name: string, content: string) => void;
 }
 
 const getFileIcon = (name: string) => {
@@ -290,11 +288,9 @@ const FileExplorer = ({
   onCreateFile,
   onCreateFolder,
   onDeleteNode,
-  onRenameNode,
-  onUploadFile
+  onRenameNode
 }: FileExplorerProps) => {
   const [newItem, setNewItem] = useState<{ type: "file" | "folder"; path: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleCreateFile = (path: string) => {
     setNewItem({ type: "file", path });
@@ -315,54 +311,8 @@ const FileExplorer = ({
     setNewItem(null);
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const uploadedFiles = e.target.files;
-    if (!uploadedFiles) return;
-
-    Array.from(uploadedFiles).forEach(file => {
-      const reader = new FileReader();
-      const isImage = file.type.startsWith('image/');
-      
-      if (isImage) {
-        reader.onload = () => {
-          const base64 = reader.result as string;
-          // Store as data URI for images
-          if (onUploadFile) {
-            onUploadFile("/public", file.name, base64);
-          } else {
-            onCreateFile?.("/public", file.name);
-          }
-          toast.success(`Uploaded ${file.name}`);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        reader.onload = () => {
-          const content = reader.result as string;
-          if (onUploadFile) {
-            onUploadFile("/src", file.name, content);
-          } else {
-            onCreateFile?.("/src", file.name);
-          }
-          toast.success(`Uploaded ${file.name}`);
-        };
-        reader.readAsText(file);
-      }
-    });
-
-    // Reset input
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
   return (
     <div className="h-full bg-sidebar overflow-y-auto scrollbar-thin">
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        accept="image/*,.tsx,.ts,.jsx,.js,.css,.html,.json,.md,.txt"
-        onChange={handleFileUpload}
-        className="hidden"
-      />
       <ContextMenu>
         <ContextMenuTrigger className="block">
           <div className="p-3 border-b border-border flex items-center justify-between">
@@ -370,13 +320,6 @@ const FileExplorer = ({
               Explorer
             </h2>
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="p-1 hover:bg-secondary rounded transition-colors"
-                title="Upload File"
-              >
-                <Upload className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-              </button>
               <button
                 onClick={() => setNewItem({ type: "file", path: "" })}
                 className="p-1 hover:bg-secondary rounded transition-colors"
@@ -395,10 +338,6 @@ const FileExplorer = ({
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-48">
-          <ContextMenuItem onClick={() => fileInputRef.current?.click()} className="gap-2">
-            <Upload className="w-4 h-4" />
-            Upload File
-          </ContextMenuItem>
           <ContextMenuItem onClick={() => setNewItem({ type: "file", path: "" })} className="gap-2">
             <FilePlus className="w-4 h-4" />
             New File
