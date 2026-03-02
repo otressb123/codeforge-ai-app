@@ -195,7 +195,14 @@ const buildModuleSystem = (files: Record<string, string>): string => {
         return `__require(${JSON.stringify(String(modulePath))});`;
       });
       
-      // Transform exports
+      // Transform exports (only outside string literals)
+      // First, protect string literals by replacing them with placeholders
+      const strings: string[] = [];
+      processedCode = processedCode.replace(/(["'`])(?:(?!\1|\\).|\\.)*?\1/g, (match) => {
+        strings.push(match);
+        return `__STR_${strings.length - 1}__`;
+      });
+      
       processedCode = processedCode.replace(/export\s+default\s+/g, "__exports.default = ");
       processedCode = processedCode.replace(/export\s+(const|let|var|function|class)\s+(\w+)/g, "$1 $2; __exports.$2 = $2");
       processedCode = processedCode.replace(/export\s*\{([^}]+)\}/g, (_, exports) => {
@@ -204,6 +211,9 @@ const buildModuleSystem = (files: Record<string, string>): string => {
           return `__exports.${alias || name} = ${name}`;
         }).join("; ");
       });
+      
+      // Restore string literals
+      processedCode = processedCode.replace(/__STR_(\d+)__/g, (_, idx) => strings[parseInt(idx)]);
       
       // Transpile
       const transpiled = transpileCode(processedCode, normalizedPath);
@@ -447,8 +457,16 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
     }
     
     // Boot the app
+    // Patch createRoot so it's only called once per container
+    const __origCreateRoot = ReactDOM.createRoot;
+    let __appRoot = null;
+    ReactDOM.createRoot = function(container, options) {
+      if (__appRoot) return __appRoot;
+      __appRoot = __origCreateRoot.call(ReactDOM, container, options);
+      return __appRoot;
+    };
+
     try {
-      // Try main entry points first (they typically call createRoot themselves)
       const entryPoints = ['/src/main.tsx', '/src/index.tsx', '/src/main.jsx', '/src/index.jsx', '/main.tsx', '/index.tsx'];
       let mainModule = null;
       
@@ -459,11 +477,8 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
         }
       }
       
-      // If main entry rendered the app, we're done
-      if (mainModule && document.getElementById('root').hasChildNodes()) {
-        // App was rendered by the entry point
-      } else {
-        // Fallback: try App directly
+      // If entry point didn't render, fallback to App directly
+      if (!document.getElementById('root').hasChildNodes()) {
         let App;
         const appPaths = ['/src/App.tsx', '/src/App.jsx', '/App.tsx', '/App.jsx'];
         for (const appPath of appPaths) {
@@ -473,12 +488,10 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
           }
         }
         
-        if (App && !document.getElementById('root').hasChildNodes()) {
+        if (App) {
           const root = ReactDOM.createRoot(document.getElementById('root'));
           root.render(React.createElement(App));
-        }
-        
-        if (!App && !mainModule) {
+        } else if (!mainModule) {
           document.getElementById('root').innerHTML = '<div class="preview-error">No App component found. Make sure you have App.tsx or main.tsx in your project.</div>';
         }
       }
