@@ -112,6 +112,12 @@ const buildModuleSystem = (files: Record<string, string>): string => {
         // Remove type imports from mixed imports
         return match.replace(/\btype\s+\w+,?\s*/g, "").replace(/,\s*}/g, "}").replace(/{\s*,/g, "{");
       });
+
+      // Remove TypeScript export type/interface declarations (handles multi-line with braces)
+      processedCode = processedCode.replace(/export\s+(type|interface)\s+\w+[^{;]*\{[^}]*\}/gs, "/* type removed */");
+      // Remove single-line export type aliases: export type X = ...;
+      processedCode = processedCode.replace(/export\s+type\s+\w+\s*=\s*[^;]+;/g, "/* type removed */");
+      processedCode = processedCode.replace(/export\s+enum\s+(\w+)\s*\{[^}]*\}/g, "const $1 = {}; __exports.$1 = $1;");
       
       // Transform relative imports
       processedCode = processedCode.replace(
@@ -197,7 +203,10 @@ const buildModuleSystem = (files: Record<string, string>): string => {
       
       // Transform exports
       processedCode = processedCode.replace(/export\s+default\s+/g, "__exports.default = ");
-      processedCode = processedCode.replace(/export\s+(const|let|var|function|class)\s+(\w+)/g, "$1 $2; __exports.$2 = $2");
+      // function/class: export function X → __exports.X = function X (valid expression)
+      processedCode = processedCode.replace(/export\s+(function|class)\s+(\w+)/g, "__exports.$2 = $1 $2");
+      // const/let/var: export const X = val → const X = __exports.X = val (chain assignment)
+      processedCode = processedCode.replace(/export\s+(const|let|var)\s+(\w+)\s*=/g, "$1 $2 = __exports.$2 =");
       processedCode = processedCode.replace(/export\s*\{([^}]+)\}/g, (_, exports) => {
         return exports.split(",").map((e: string) => {
           const [name, alias] = e.trim().split(/\s+as\s+/);
