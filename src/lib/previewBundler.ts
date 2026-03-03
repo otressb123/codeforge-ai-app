@@ -113,12 +113,66 @@ const buildModuleSystem = (files: Record<string, string>): string => {
         return match.replace(/\btype\s+\w+,?\s*/g, "").replace(/,\s*}/g, "}").replace(/{\s*,/g, "{");
       });
 
-      // Remove TypeScript export type/interface declarations (handles multi-line with braces)
-      processedCode = processedCode.replace(/export\s+(type|interface)\s+\w+[^{;]*\{[^}]*\}/gs, "/* type removed */");
-      // Remove single-line export type aliases: export type X = ...;
-      processedCode = processedCode.replace(/export\s+type\s+\w+\s*=\s*[^;]+;/g, "/* type removed */");
-      processedCode = processedCode.replace(/export\s+enum\s+(\w+)\s*\{[^}]*\}/g, "const $1 = {}; __exports.$1 = $1;");
-      
+      // Remove ALL type/interface declarations (exported or not, handles multi-line with nested braces)
+      // Use a function to handle nested braces properly
+      processedCode = processedCode.replace(/(export\s+)?(type|interface)\s+\w+[\s\S]*?\{/g, (match, exp, keyword) => {
+        // Find the matching closing brace by counting
+        const startIdx = processedCode.indexOf(match);
+        if (startIdx === -1) return match;
+        let depth = 0;
+        let i = startIdx;
+        for (; i < processedCode.length; i++) {
+          if (processedCode[i] === '{') depth++;
+          if (processedCode[i] === '}') { depth--; if (depth === 0) break; }
+        }
+        return ""; // Will be handled by the broader replace below
+      });
+      // Broader approach: strip type/interface blocks with a greedy nested-brace aware replacer
+      const stripTypeBlocks = (code: string): string => {
+        return code.replace(/(export\s+)?(type|interface)\s+\w+[^{;]*\{/g, (match, _exp, _kw, offset) => {
+          let depth = 1;
+          let i = offset + match.length;
+          while (i < code.length && depth > 0) {
+            if (code[i] === '{') depth++;
+            if (code[i] === '}') depth--;
+            i++;
+          }
+          // Replace the entire block from offset to i with a comment
+          const fullBlock = code.substring(offset, i);
+          code = code.substring(0, offset) + "/* type removed */" + code.substring(i);
+          return "/* type removed */";
+        });
+      };
+      // Iteratively strip type/interface blocks
+      let prevCode = "";
+      while (prevCode !== processedCode) {
+        prevCode = processedCode;
+        // Match and remove type/interface blocks with nested braces
+        let result = "";
+        let idx = 0;
+        const typeRegex = /(export\s+)?(type|interface)\s+\w+[^{;]*\{/g;
+        let m;
+        while ((m = typeRegex.exec(processedCode)) !== null) {
+          result += processedCode.substring(idx, m.index);
+          let depth = 1;
+          let j = m.index + m[0].length;
+          while (j < processedCode.length && depth > 0) {
+            if (processedCode[j] === '{') depth++;
+            if (processedCode[j] === '}') depth--;
+            j++;
+          }
+          result += "/* type removed */";
+          idx = j;
+          typeRegex.lastIndex = idx;
+        }
+        result += processedCode.substring(idx);
+        processedCode = result;
+      }
+      // Remove single-line type aliases: (export)? type X = ...;
+      processedCode = processedCode.replace(/(export\s+)?type\s+\w+\s*=\s*[^;]+;/g, "/* type removed */");
+      processedCode = processedCode.replace(/(export\s+)?enum\s+(\w+)\s*\{[^}]*\}/g, (match, exp, name) => {
+        return exp ? `const ${name} = {}; __exports.${name} = ${name};` : `const ${name} = {};`;
+      });
       // Transform relative imports
       processedCode = processedCode.replace(
         /import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g,
