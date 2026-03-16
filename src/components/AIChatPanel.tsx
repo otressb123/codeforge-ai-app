@@ -634,6 +634,8 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
       </div>
     </div>
   );
-};
+});
+
+AIChatPanel.displayName = "AIChatPanel";
 
 export default AIChatPanel;
