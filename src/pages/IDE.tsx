@@ -5,7 +5,7 @@ import ActivityBar from "@/components/ActivityBar";
 import FileExplorer, { FileNode } from "@/components/FileExplorer";
 import EditorTabs from "@/components/EditorTabs";
 import CodeEditor, { getLanguage } from "@/components/CodeEditor";
-import AIChatPanel from "@/components/AIChatPanel";
+import AIChatPanel, { AIChatPanelRef } from "@/components/AIChatPanel";
 import PreviewPanel, { PreviewPanelRef } from "@/components/PreviewPanel";
 import SearchPanel from "@/components/SearchPanel";
 import TerminalPanel from "@/components/TerminalPanel";
