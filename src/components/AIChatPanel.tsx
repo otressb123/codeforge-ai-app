@@ -96,6 +96,13 @@ export interface AIChatPanelRef {
 }
 
 const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenerated, onFilesGenerated, previewHtml, onCaptureScreenshot, projectFiles }, ref) => {
+  // Expose auto-fix to parent via ref
+  useImperativeHandle(ref, () => ({
+    triggerAutoFix: (errorMessage: string) => {
+      handleAutoFix(errorMessage);
+    },
+  }));
+
   // Load messages from memory
   const loadMessages = (): Message[] => {
     try {
