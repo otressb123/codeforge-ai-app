@@ -326,6 +326,13 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
     }
   };
 
+  // Expose auto-fix to parent via ref
+  useImperativeHandle(ref, () => ({
+    triggerAutoFix: (errorMessage: string) => {
+      handleAutoFix(errorMessage);
+    },
+  }));
+
   const checkIfComplete = async () => {
     if (isLoading) return;
     if (!previewEnabled) setPreviewEnabled(true);
