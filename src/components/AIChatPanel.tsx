@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText, Brain, Zap, AlertTriangle } from "lucide-react";
+import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
+import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText, Brain, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -91,7 +91,12 @@ I'm not just a chatbot — I'm your **AI coding partner** with full project awar
 What shall we build? 🚀`,
 };
 
-const AIChatPanel = ({ onCodeGenerated, onFilesGenerated, previewHtml, onCaptureScreenshot, projectFiles }: AIChatPanelProps) => {
+export interface AIChatPanelRef {
+  triggerAutoFix: (errorMessage: string) => void;
+}
+
+const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenerated, onFilesGenerated, previewHtml, onCaptureScreenshot, projectFiles }, ref) => {
+
   // Load messages from memory
   const loadMessages = (): Message[] => {
     try {
@@ -320,6 +325,13 @@ const AIChatPanel = ({ onCodeGenerated, onFilesGenerated, previewHtml, onCapture
       setIsLoading(false);
     }
   };
+
+  // Expose auto-fix to parent via ref
+  useImperativeHandle(ref, () => ({
+    triggerAutoFix: (errorMessage: string) => {
+      handleAutoFix(errorMessage);
+    },
+  }));
 
   const checkIfComplete = async () => {
     if (isLoading) return;
@@ -630,6 +642,8 @@ const AIChatPanel = ({ onCodeGenerated, onFilesGenerated, previewHtml, onCapture
       </div>
     </div>
   );
-};
+});
+
+AIChatPanel.displayName = "AIChatPanel";
 
 export default AIChatPanel;

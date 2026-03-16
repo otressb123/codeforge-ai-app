@@ -10,6 +10,7 @@ interface PreviewPanelProps {
   html?: string;
   files?: FileNode[];
   onRefresh?: () => void;
+  onPreviewError?: (error: string) => void;
 }
 
 export interface PreviewPanelRef {
@@ -18,7 +19,7 @@ export interface PreviewPanelRef {
 
 type DeviceType = "desktop" | "tablet" | "mobile";
 
-const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(({ html, files, onRefresh }, ref) => {
+const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(({ html, files, onRefresh, onPreviewError }, ref) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Expose capture function to parent
@@ -70,16 +71,20 @@ const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(({ html, fil
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  // Listen for console messages from iframe
+  // Listen for console messages and errors from iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === "console") {
         setConsoleLogs(prev => [...prev.slice(-49), event.data.message]);
       }
+      if (event.data?.type === "preview-error" && event.data.error) {
+        setConsoleLogs(prev => [...prev.slice(-49), `[ERROR] ${event.data.error}`]);
+        onPreviewError?.(event.data.error);
+      }
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [onPreviewError]);
 
   const defaultContent = `
     <!DOCTYPE html>

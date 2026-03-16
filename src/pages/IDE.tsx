@@ -5,7 +5,7 @@ import ActivityBar from "@/components/ActivityBar";
 import FileExplorer, { FileNode } from "@/components/FileExplorer";
 import EditorTabs from "@/components/EditorTabs";
 import CodeEditor, { getLanguage } from "@/components/CodeEditor";
-import AIChatPanel from "@/components/AIChatPanel";
+import AIChatPanel, { AIChatPanelRef } from "@/components/AIChatPanel";
 import PreviewPanel, { PreviewPanelRef } from "@/components/PreviewPanel";
 import SearchPanel from "@/components/SearchPanel";
 import TerminalPanel from "@/components/TerminalPanel";
@@ -70,6 +70,20 @@ const IDE = () => {
   const [previewKey, setPreviewKey] = useState(0);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const previewRef = useRef<PreviewPanelRef>(null);
+  const aiChatRef = useRef<AIChatPanelRef>(null);
+  const lastAutoFixError = useRef<string>("");
+  const autoFixCooldown = useRef<number>(0);
+
+  // Auto-fix handler: debounced, prevents loops
+  const handlePreviewError = useCallback((error: string) => {
+    const now = Date.now();
+    // Skip if same error or within 15s cooldown
+    if (error === lastAutoFixError.current || now - autoFixCooldown.current < 15000) return;
+    lastAutoFixError.current = error;
+    autoFixCooldown.current = now;
+    // Trigger auto-fix on the sidebar AI chat
+    aiChatRef.current?.triggerAutoFix(error);
+  }, []);
 
   // Screenshot capture function for AI
   const handleCaptureScreenshot = useCallback(async () => {
@@ -480,7 +494,7 @@ const IDE = () => {
       case "search":
         return <SearchPanel />;
       case "ai":
-        return <AIChatPanel onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} />;
+        return <AIChatPanel ref={aiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} />;
       case "terminal":
         return <TerminalPanel />;
       case "settings":
@@ -604,6 +618,7 @@ const IDE = () => {
                   html={getPreviewHtml()} 
                   files={files}
                   onRefresh={() => setPreviewKey(prev => prev + 1)}
+                  onPreviewError={handlePreviewError}
                 />
               </ResizablePanel>
               <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
