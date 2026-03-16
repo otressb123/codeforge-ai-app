@@ -91,7 +91,11 @@ I'm not just a chatbot — I'm your **AI coding partner** with full project awar
 What shall we build? 🚀`,
 };
 
-const AIChatPanel = ({ onCodeGenerated, onFilesGenerated, previewHtml, onCaptureScreenshot, projectFiles }: AIChatPanelProps) => {
+export interface AIChatPanelRef {
+  triggerAutoFix: (errorMessage: string) => void;
+}
+
+const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenerated, onFilesGenerated, previewHtml, onCaptureScreenshot, projectFiles }, ref) => {
   // Load messages from memory
   const loadMessages = (): Message[] => {
     try {
