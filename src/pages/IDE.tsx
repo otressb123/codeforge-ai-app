@@ -618,6 +618,7 @@ const IDE = () => {
                   html={getPreviewHtml()} 
                   files={files}
                   onRefresh={() => setPreviewKey(prev => prev + 1)}
+                  onPreviewError={handlePreviewError}
                 />
               </ResizablePanel>
               <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
