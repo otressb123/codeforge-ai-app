@@ -325,7 +325,7 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
   <div id="root"></div>
   
    <script>
-    // Console capture for parent frame
+    // Console capture + error detection for parent frame
     (function() {
       const originalLog = console.log;
       const originalError = console.error;
@@ -343,6 +343,31 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
       console.log = function() { sendToParent('log', arguments); originalLog.apply(console, arguments); };
       console.error = function() { sendToParent('error', arguments); originalError.apply(console, arguments); };
       console.warn = function() { sendToParent('warn', arguments); originalWarn.apply(console, arguments); };
+
+      // Capture uncaught errors
+      var _lastError = '';
+      var _errorDebounce = null;
+      function reportError(msg) {
+        if (msg === _lastError) return;
+        _lastError = msg;
+        clearTimeout(_errorDebounce);
+        _errorDebounce = setTimeout(function() {
+          try {
+            parent.postMessage({ type: 'preview-error', error: msg }, '*');
+          } catch(e) {}
+        }, 500);
+      }
+      window.onerror = function(msg, source, line, col, err) {
+        var detail = String(msg);
+        if (source) detail += ' at ' + source.replace(/^.*\//, '') + ':' + line + ':' + col;
+        if (err && err.stack) detail += '\\n' + err.stack.split('\\n').slice(0,5).join('\\n');
+        reportError(detail);
+      };
+      window.addEventListener('unhandledrejection', function(e) {
+        var reason = e.reason;
+        var msg = reason instanceof Error ? reason.message + '\\n' + (reason.stack || '').split('\\n').slice(0,5).join('\\n') : String(reason);
+        reportError('Unhandled Promise Rejection: ' + msg);
+      });
     })();
     
     // Module system
