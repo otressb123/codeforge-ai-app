@@ -10,6 +10,7 @@ interface PreviewPanelProps {
   html?: string;
   files?: FileNode[];
   onRefresh?: () => void;
+  onPreviewError?: (error: string) => void;
 }
 
 export interface PreviewPanelRef {
