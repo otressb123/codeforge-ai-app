@@ -158,7 +158,8 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
     );
   }, [contextEnabled, projectFiles]);
 
-  const streamChat = async (allMessages: Message[], screenshot?: string | null) => {
+  const streamChat = async (allMessages: Message[], screenshot?: string | null, retryCount = 0): Promise<string> => {
+    const MAX_RETRIES = 3;
     let messagesToSend = [...allMessages];
 
     // Add preview context
@@ -188,8 +189,26 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      if (response.status === 429) throw new Error("Rate limit exceeded. Please wait a moment.");
-      if (response.status === 402) throw new Error("AI credits exhausted. Please add more credits.");
+      if (response.status === 429) {
+        if (retryCount < MAX_RETRIES) {
+          const delay = Math.pow(2, retryCount + 1) * 1000; // 2s, 4s, 8s
+          toast.warning(`⏳ Rate limited. Retrying in ${delay / 1000}s... (${retryCount + 1}/${MAX_RETRIES})`);
+          await new Promise(r => setTimeout(r, delay));
+          return streamChat(allMessages, screenshot, retryCount + 1);
+        }
+        toast.error("🚫 Rate limit exceeded. Please wait a minute and try again.", {
+          description: "Too many requests. The AI needs a short cooldown.",
+          duration: 8000,
+        });
+        throw new Error("Rate limit exceeded after retries");
+      }
+      if (response.status === 402) {
+        toast.error("💳 AI credits exhausted", {
+          description: "Add more credits in Settings → Workspace → Usage to continue.",
+          duration: 10000,
+        });
+        throw new Error("AI credits exhausted");
+      }
       throw new Error(errorData.error || "Failed to get AI response");
     }
 

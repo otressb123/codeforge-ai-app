@@ -8,6 +8,8 @@ interface CodeEditorProps {
   content: string;
   language: string;
   onChange: (value: string | undefined) => void;
+  onInlineEdit?: (selectedCode: string, instruction: string, fullContent: string) => Promise<string | null>;
+  projectFiles?: { path: string; content: string }[];
 }
 
 interface DiagnosticCounts {
@@ -19,34 +21,35 @@ interface DiagnosticCounts {
 const getLanguage = (filename: string): string => {
   const ext = filename.split('.').pop()?.toLowerCase();
   switch (ext) {
-    case 'tsx':
-      return 'typescriptreact';
-    case 'ts':
-      return 'typescript';
-    case 'jsx':
-      return 'javascriptreact';
-    case 'js':
-      return 'javascript';
-    case 'json':
-      return 'json';
-    case 'css':
-      return 'css';
-    case 'html':
-      return 'html';
-    case 'md':
-      return 'markdown';
-    default:
-      return 'plaintext';
+    case 'tsx': return 'typescriptreact';
+    case 'ts': return 'typescript';
+    case 'jsx': return 'javascriptreact';
+    case 'js': return 'javascript';
+    case 'json': return 'json';
+    case 'css': return 'css';
+    case 'html': return 'html';
+    case 'md': return 'markdown';
+    default: return 'plaintext';
   }
 };
 
-const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+
+const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles }: CodeEditorProps) => {
   const [diagnostics, setDiagnostics] = useState<DiagnosticCounts>({ errors: 0, warnings: 0, info: 0 });
   const [autoFixedIcons, setAutoFixedIcons] = useState<string[]>([]);
   const [autoFixedFramer, setAutoFixedFramer] = useState<string[]>([]);
+  const [inlineEditVisible, setInlineEditVisible] = useState(false);
+  const [inlineEditInstruction, setInlineEditInstruction] = useState("");
+  const [inlineEditLoading, setInlineEditLoading] = useState(false);
+  const [inlineEditPosition, setInlineEditPosition] = useState({ top: 0, left: 0 });
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
   const decorationsRef = useRef<any>(null);
+  const inlineWidgetRef = useRef<any>(null);
+  const inlineInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Detect auto-fixed imports whenever content changes
   useEffect(() => {
@@ -104,6 +107,253 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
     decorationsRef.current = editor.createDecorationsCollection(decorations);
   }, [autoFixedIcons, autoFixedFramer, content]);
 
+  // ── Inline Edit (Cmd+K) ──
+  const showInlineEdit = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    
+    const selection = editor.getSelection();
+    if (!selection || selection.isEmpty()) {
+      // Use current line if no selection
+      const pos = editor.getPosition();
+      if (pos) {
+        editor.setSelection({
+          startLineNumber: pos.lineNumber,
+          startColumn: 1,
+          endLineNumber: pos.lineNumber,
+          endColumn: editor.getModel()?.getLineLength(pos.lineNumber) + 1 || 1,
+        });
+      }
+    }
+
+    // Get position for the inline widget
+    const sel = editor.getSelection();
+    if (!sel) return;
+
+    const coords = editor.getScrolledVisiblePosition({ lineNumber: sel.endLineNumber, column: 1 });
+    if (coords) {
+      setInlineEditPosition({ top: coords.top + coords.height + 4, left: coords.left + 60 });
+    }
+    
+    setInlineEditVisible(true);
+    setInlineEditInstruction("");
+    setTimeout(() => inlineInputRef.current?.focus(), 50);
+  }, []);
+
+  const handleInlineEditSubmit = useCallback(async () => {
+    const editor = editorRef.current;
+    if (!editor || !inlineEditInstruction.trim()) return;
+    
+    const selection = editor.getSelection();
+    if (!selection) return;
+    
+    const model = editor.getModel();
+    if (!model) return;
+    
+    const selectedText = model.getValueInRange(selection);
+    const fullContent = model.getValue();
+    
+    setInlineEditLoading(true);
+    
+    try {
+      if (onInlineEdit) {
+        const result = await onInlineEdit(selectedText, inlineEditInstruction, fullContent);
+        if (result) {
+          editor.executeEdits("inline-edit", [{
+            range: selection,
+            text: result,
+          }]);
+        }
+      } else {
+        // Built-in inline edit via edge function
+        const response = await fetch(CHAT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: [
+              { role: "user", content: `Edit this code according to the instruction. Return ONLY the modified code, no explanations, no markdown fences.\n\nInstruction: ${inlineEditInstruction}\n\nCode:\n${selectedText}` }
+            ],
+            model: "google/gemini-3-flash-preview",
+          }),
+        });
+
+        if (!response.ok || !response.body) throw new Error("Failed");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let result = "";
+        let textBuffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          textBuffer += decoder.decode(value, { stream: true });
+          let idx: number;
+          while ((idx = textBuffer.indexOf("\n")) !== -1) {
+            let line = textBuffer.slice(0, idx);
+            textBuffer = textBuffer.slice(idx + 1);
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (!line.startsWith("data: ")) continue;
+            const json = line.slice(6).trim();
+            if (json === "[DONE]") break;
+            try {
+              const parsed = JSON.parse(json);
+              const c = parsed.choices?.[0]?.delta?.content;
+              if (c) result += c;
+            } catch {}
+          }
+        }
+
+        // Strip markdown fences if the model wrapped them
+        let cleaned = result.trim();
+        if (cleaned.startsWith("```")) {
+          cleaned = cleaned.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
+        }
+
+        if (cleaned) {
+          editor.executeEdits("inline-edit", [{
+            range: selection,
+            text: cleaned,
+          }]);
+        }
+      }
+    } catch (err) {
+      console.error("Inline edit error:", err);
+    } finally {
+      setInlineEditLoading(false);
+      setInlineEditVisible(false);
+    }
+  }, [inlineEditInstruction, onInlineEdit]);
+
+  const cancelInlineEdit = useCallback(() => {
+    setInlineEditVisible(false);
+    setInlineEditInstruction("");
+    editorRef.current?.focus();
+  }, []);
+
+  // ── AI Autocomplete ──
+  const registerAutocomplete = useCallback((editor: any, monaco: any) => {
+    monaco.languages.registerInlineCompletionsProvider(
+      ["typescript", "typescriptreact", "javascript", "javascriptreact", "css", "html"],
+      {
+        provideInlineCompletions: async (model: any, position: any, context: any, token: any) => {
+          // Debounce - only trigger after user pauses typing
+          if (autocompleteTimerRef.current) {
+            clearTimeout(autocompleteTimerRef.current);
+          }
+
+          return new Promise((resolve) => {
+            autocompleteTimerRef.current = setTimeout(async () => {
+              try {
+                // Get surrounding code context
+                const textBefore = model.getValueInRange({
+                  startLineNumber: Math.max(1, position.lineNumber - 20),
+                  startColumn: 1,
+                  endLineNumber: position.lineNumber,
+                  endColumn: position.column,
+                });
+                const textAfter = model.getValueInRange({
+                  startLineNumber: position.lineNumber,
+                  startColumn: position.column,
+                  endLineNumber: Math.min(model.getLineCount(), position.lineNumber + 5),
+                  endColumn: model.getLineLength(Math.min(model.getLineCount(), position.lineNumber + 5)) + 1,
+                });
+
+                // Don't trigger on very short context or empty lines
+                const currentLine = model.getLineContent(position.lineNumber).trim();
+                if (currentLine.length < 3 && position.lineNumber > 1) {
+                  resolve({ items: [] });
+                  return;
+                }
+
+                if (token.isCancellationRequested) {
+                  resolve({ items: [] });
+                  return;
+                }
+
+                const response = await fetch(CHAT_URL, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                  },
+                  body: JSON.stringify({
+                    messages: [
+                      {
+                        role: "user",
+                        content: `Complete this code. Return ONLY the completion text (the code that comes next), nothing else. No explanations, no markdown. Just the raw code continuation.\n\nCode before cursor:\n${textBefore}\n\nCode after cursor:\n${textAfter}`,
+                      },
+                    ],
+                    model: "google/gemini-2.5-flash-lite",
+                  }),
+                });
+
+                if (!response.ok || !response.body) {
+                  resolve({ items: [] });
+                  return;
+                }
+
+                // Read non-streaming or streaming response
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let completion = "";
+                let buf = "";
+
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  buf += decoder.decode(value, { stream: true });
+                  let idx: number;
+                  while ((idx = buf.indexOf("\n")) !== -1) {
+                    let line = buf.slice(0, idx);
+                    buf = buf.slice(idx + 1);
+                    if (line.endsWith("\r")) line = line.slice(0, -1);
+                    if (!line.startsWith("data: ")) continue;
+                    const j = line.slice(6).trim();
+                    if (j === "[DONE]") break;
+                    try {
+                      const p = JSON.parse(j);
+                      const c = p.choices?.[0]?.delta?.content;
+                      if (c) completion += c;
+                    } catch {}
+                  }
+                }
+
+                let cleaned = completion.trim();
+                // Strip markdown fences
+                if (cleaned.startsWith("```")) {
+                  cleaned = cleaned.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
+                }
+
+                if (cleaned && cleaned.length > 2 && cleaned.length < 500) {
+                  resolve({
+                    items: [{
+                      insertText: cleaned,
+                      range: {
+                        startLineNumber: position.lineNumber,
+                        startColumn: position.column,
+                        endLineNumber: position.lineNumber,
+                        endColumn: position.column,
+                      },
+                    }],
+                  });
+                } else {
+                  resolve({ items: [] });
+                }
+              } catch {
+                resolve({ items: [] });
+              }
+            }, 1500); // 1.5s debounce
+          });
+        },
+        freeInlineCompletions: () => {},
+      }
+    );
+  }, []);
+
   const handleBeforeMount: BeforeMount = (monaco) => {
     // Configure TypeScript/JavaScript compiler options for JSX support
     monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
@@ -143,7 +393,7 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
       noSyntaxValidation: false,
     });
 
-    // Add React types definition for better JSX support
+    // Add React types definition
     const reactTypes = `
       declare namespace React {
         interface ReactElement<P = any> {}
@@ -172,6 +422,17 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
 
+    // ── Register Cmd+K for inline edit ──
+    editor.addAction({
+      id: "inline-edit",
+      label: "AI: Edit Selection (Cmd+K)",
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK],
+      run: () => showInlineEdit(),
+    });
+
+    // ── Register AI autocomplete ──
+    registerAutocomplete(editor, monaco);
+
     // Listen for model markers (diagnostics) changes
     const updateDiagnostics = () => {
       const model = editor.getModel();
@@ -179,7 +440,7 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
         const markers = monaco.editor.getModelMarkers({ resource: model.uri });
         const counts = { errors: 0, warnings: 0, info: 0 };
         
-        markers.forEach(marker => {
+        markers.forEach((marker: any) => {
           switch (marker.severity) {
             case monaco.MarkerSeverity.Error:
               counts.errors++;
@@ -198,16 +459,13 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
       }
     };
 
-    // Initial check
     setTimeout(updateDiagnostics, 500);
 
-    // Listen for changes
     const disposable = monaco.editor.onDidChangeMarkers(() => {
       updateDiagnostics();
     });
 
-    // Also update on content change (with debounce)
-    let timeout: NodeJS.Timeout;
+    let timeout: ReturnType<typeof setTimeout>;
     const contentDisposable = editor.onDidChangeModelContent(() => {
       clearTimeout(timeout);
       timeout = setTimeout(updateDiagnostics, 300);
@@ -218,13 +476,13 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
       contentDisposable.dispose();
       clearTimeout(timeout);
     };
-  }, []);
+  }, [showInlineEdit, registerAutocomplete]);
 
   const totalAutoFixes = autoFixedIcons.length + autoFixedFramer.length;
   const totalIssues = diagnostics.errors + diagnostics.warnings + diagnostics.info;
 
   return (
-    <div className="h-full w-full bg-editor flex flex-col">
+    <div ref={containerRef} className="h-full w-full bg-editor flex flex-col relative">
       <div className="flex-1">
         <Editor
           height="100%"
@@ -263,9 +521,49 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
             lightbulb: { enabled: "on" },
             renderValidationDecorations: "on",
             glyphMargin: true,
+            inlineSuggest: { enabled: true },
           }}
         />
       </div>
+
+      {/* Inline Edit Widget (Cmd+K) */}
+      {inlineEditVisible && (
+        <div 
+          className="absolute z-50 bg-popover border border-border rounded-lg shadow-2xl p-3 w-[400px]"
+          style={{ top: Math.min(inlineEditPosition.top, (containerRef.current?.offsetHeight || 400) - 120), left: Math.max(inlineEditPosition.left, 60) }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <Wand2 className="w-4 h-4 text-primary" />
+            <span className="text-xs font-medium text-foreground">AI Edit (Cmd+K)</span>
+            {inlineEditLoading && <Loader2 className="w-3 h-3 animate-spin text-primary ml-auto" />}
+          </div>
+          <input
+            ref={inlineInputRef}
+            type="text"
+            value={inlineEditInstruction}
+            onChange={(e) => setInlineEditInstruction(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleInlineEditSubmit();
+              }
+              if (e.key === "Escape") cancelInlineEdit();
+            }}
+            placeholder="Describe the edit... (Enter to apply, Esc to cancel)"
+            className="w-full bg-background text-foreground text-sm px-3 py-2 rounded-md border border-border focus:outline-none focus:ring-2 focus:ring-primary/50"
+            disabled={inlineEditLoading}
+          />
+          <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+            <span>Select code → Cmd+K → describe change</span>
+            <div className="flex gap-2">
+              <button onClick={cancelInlineEdit} className="px-2 py-1 rounded hover:bg-muted transition-colors">Cancel</button>
+              <button onClick={handleInlineEditSubmit} className="px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors" disabled={inlineEditLoading}>
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Status bar with diagnostic counts */}
       <div className="h-6 bg-panel border-t border-border flex items-center justify-between px-3 text-xs">
@@ -321,6 +619,19 @@ const CodeEditor = ({ content, language, onChange }: CodeEditorProps) => {
               </Tooltip>
             </TooltipProvider>
           )}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-primary/70 cursor-help flex items-center gap-1">
+                  <Wand2 className="w-3 h-3" />
+                  Cmd+K
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>Select code and press <strong>Cmd+K</strong> for AI inline editing</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <span className="text-muted-foreground">{language}</span>
         </div>
       </div>
