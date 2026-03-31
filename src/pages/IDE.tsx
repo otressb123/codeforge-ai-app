@@ -71,6 +71,7 @@ const IDE = () => {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const previewRef = useRef<PreviewPanelRef>(null);
   const aiChatRef = useRef<AIChatPanelRef>(null);
+  const bottomAiChatRef = useRef<AIChatPanelRef>(null);
   const lastAutoFixError = useRef<string>("");
   const autoFixCooldown = useRef<number>(0);
 
@@ -81,8 +82,9 @@ const IDE = () => {
     if (error === lastAutoFixError.current || now - autoFixCooldown.current < 15000) return;
     lastAutoFixError.current = error;
     autoFixCooldown.current = now;
-    // Trigger auto-fix on the sidebar AI chat
-    aiChatRef.current?.triggerAutoFix(error);
+    // Try sidebar AI chat first, then bottom panel
+    const ref = aiChatRef.current || bottomAiChatRef.current;
+    ref?.triggerAutoFix(error);
   }, []);
 
   // Screenshot capture function for AI
@@ -623,7 +625,7 @@ const IDE = () => {
               </ResizablePanel>
               <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
               <ResizablePanel defaultSize={40}>
-                <AIChatPanel onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} />
+                <AIChatPanel ref={bottomAiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} />
               </ResizablePanel>
             </ResizablePanelGroup>
           </ResizablePanel>
