@@ -506,7 +506,7 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
           options={{
             fontSize: 14,
             fontFamily: "'JetBrains Mono', monospace",
-            minimap: { enabled: true, scale: 1 },
+            minimap: { enabled: true, scale: 1, showSlider: "always" },
             scrollBeyondLastLine: false,
             wordWrap: "on",
             lineNumbers: "on",
@@ -528,6 +528,20 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
             renderValidationDecorations: "on",
             glyphMargin: true,
             inlineSuggest: { enabled: true },
+            folding: true,
+            foldingStrategy: "indentation",
+            showFoldingControls: "always",
+            matchBrackets: "always",
+            guides: { bracketPairs: true, indentation: true },
+            multiCursorModifier: "alt",
+            find: { addExtraSpaceOnTop: true, autoFindInSelection: "multiline", seedSearchStringFromSelection: "selection" },
+            linkedEditing: true,
+            renderWhitespace: "selection",
+            columnSelection: true,
+            dragAndDrop: true,
+            snippetSuggestions: "inline",
+            tabCompletion: "on",
+            stickyScroll: { enabled: true },
           }}
         />
       </div>
