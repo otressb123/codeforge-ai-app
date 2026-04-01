@@ -584,12 +584,17 @@ const IDE = () => {
                     onTabClose={handleTabClose}
                   />
                   {currentFile ? (
-                    <div className="flex-1">
-                      <CodeEditor
-                        content={currentFile.content}
-                        language={getLanguage(currentFile.name)}
-                        onChange={handleCodeChange}
-                      />
+                    <div className="flex-1 flex flex-col">
+                      <BreadcrumbBar filePath={currentFile.path} />
+                      <div className="flex-1">
+                        <CodeEditor
+                          content={currentFile.content}
+                          language={getLanguage(currentFile.name)}
+                          onChange={handleCodeChange}
+                          autocompleteEnabled={autocompleteEnabled}
+                          onAutocompleteToggle={() => setAutocompleteEnabled(prev => !prev)}
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div className="flex-1 flex items-center justify-center">
