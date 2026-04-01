@@ -10,6 +10,9 @@ import PreviewPanel, { PreviewPanelRef } from "@/components/PreviewPanel";
 import SearchPanel from "@/components/SearchPanel";
 import TerminalPanel from "@/components/TerminalPanel";
 import SettingsPanel from "@/components/SettingsPanel";
+import ExtensionsPanel from "@/components/ExtensionsPanel";
+import GitPanel from "@/components/GitPanel";
+import BreadcrumbBar from "@/components/BreadcrumbBar";
 import NewProjectDialog from "@/components/NewProjectDialog";
 import GitHubDialog from "@/components/GitHubDialog";
 import ExportImportDialog from "@/components/ExportImportDialog";
@@ -18,7 +21,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
-type SidebarTab = "files" | "search" | "ai" | "terminal" | "settings";
+type SidebarTab = "files" | "search" | "ai" | "extensions" | "git" | "terminal" | "settings";
 
 interface OpenFile {
   path: string;
