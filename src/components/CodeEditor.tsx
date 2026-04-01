@@ -1,5 +1,5 @@
 import Editor, { OnMount, BeforeMount } from "@monaco-editor/react";
-import { Loader2, AlertCircle, AlertTriangle, Info, Wand2, Sparkles, SparklesIcon } from "lucide-react";
+import { Loader2, AlertCircle, AlertTriangle, Info, Wand2, Sparkles } from "lucide-react";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { detectMissingLucideImports, detectMissingFramerMotionImports } from "@/lib/autoFixImports";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";

@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Search, Download, Check, Star, Puzzle, Palette, Brain, Code2, Wrench, TrendingUp, Filter } from "lucide-react";
+import { Search, Download, Check, Star, Puzzle, Palette, Brain, Code2, Wrench } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 

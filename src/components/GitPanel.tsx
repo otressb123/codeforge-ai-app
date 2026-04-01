@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { GitBranch, GitCommit, GitMerge, Plus, Minus, FileText, Check, RefreshCw, ChevronDown, ChevronRight, Clock, User } from "lucide-react";
+import { GitBranch, GitCommit, Plus, Minus, FileText, Check, RefreshCw, ChevronDown, ChevronRight, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
