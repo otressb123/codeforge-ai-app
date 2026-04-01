@@ -625,6 +625,27 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
               </Tooltip>
             </TooltipProvider>
           )}
+          {/* AI Copilot Toggle */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onAutocompleteToggle}
+                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors ${
+                    autocompleteEnabled
+                      ? "text-primary bg-primary/10 hover:bg-primary/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span className="text-[10px] font-medium">Copilot</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>AI Autocomplete: <strong>{autocompleteEnabled ? "ON" : "OFF"}</strong> — Click to toggle</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
