@@ -501,6 +501,10 @@ const IDE = () => {
         return <SearchPanel />;
       case "ai":
         return <AIChatPanel ref={aiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} />;
+      case "git":
+        return <GitPanel />;
+      case "extensions":
+        return <ExtensionsPanel />;
       case "terminal":
         return <TerminalPanel />;
       case "settings":
