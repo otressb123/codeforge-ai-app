@@ -248,6 +248,10 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
           }
 
           return new Promise((resolve) => {
+            if (!autocompleteEnabled) {
+              resolve({ items: [] });
+              return;
+            }
             autocompleteTimerRef.current = setTimeout(async () => {
               try {
                 // Get surrounding code context
