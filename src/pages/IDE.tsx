@@ -10,6 +10,9 @@ import PreviewPanel, { PreviewPanelRef } from "@/components/PreviewPanel";
 import SearchPanel from "@/components/SearchPanel";
 import TerminalPanel from "@/components/TerminalPanel";
 import SettingsPanel from "@/components/SettingsPanel";
+import ExtensionsPanel from "@/components/ExtensionsPanel";
+import GitPanel from "@/components/GitPanel";
+import BreadcrumbBar from "@/components/BreadcrumbBar";
 import NewProjectDialog from "@/components/NewProjectDialog";
 import GitHubDialog from "@/components/GitHubDialog";
 import ExportImportDialog from "@/components/ExportImportDialog";
@@ -18,7 +21,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
-type SidebarTab = "files" | "search" | "ai" | "terminal" | "settings";
+type SidebarTab = "files" | "search" | "ai" | "extensions" | "git" | "terminal" | "settings";
 
 interface OpenFile {
   path: string;
@@ -69,6 +72,7 @@ const IDE = () => {
   const [isGitHubConnected, setIsGitHubConnected] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [autocompleteEnabled, setAutocompleteEnabled] = useState(true);
   const previewRef = useRef<PreviewPanelRef>(null);
   const aiChatRef = useRef<AIChatPanelRef>(null);
   const bottomAiChatRef = useRef<AIChatPanelRef>(null);
@@ -497,6 +501,10 @@ const IDE = () => {
         return <SearchPanel />;
       case "ai":
         return <AIChatPanel ref={aiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} />;
+      case "git":
+        return <GitPanel />;
+      case "extensions":
+        return <ExtensionsPanel />;
       case "terminal":
         return <TerminalPanel />;
       case "settings":
@@ -576,12 +584,17 @@ const IDE = () => {
                     onTabClose={handleTabClose}
                   />
                   {currentFile ? (
-                    <div className="flex-1">
-                      <CodeEditor
-                        content={currentFile.content}
-                        language={getLanguage(currentFile.name)}
-                        onChange={handleCodeChange}
-                      />
+                    <div className="flex-1 flex flex-col">
+                      <BreadcrumbBar filePath={currentFile.path} />
+                      <div className="flex-1">
+                        <CodeEditor
+                          content={currentFile.content}
+                          language={getLanguage(currentFile.name)}
+                          onChange={handleCodeChange}
+                          autocompleteEnabled={autocompleteEnabled}
+                          onAutocompleteToggle={() => setAutocompleteEnabled(prev => !prev)}
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div className="flex-1 flex items-center justify-center">

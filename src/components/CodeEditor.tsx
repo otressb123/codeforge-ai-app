@@ -1,5 +1,5 @@
 import Editor, { OnMount, BeforeMount } from "@monaco-editor/react";
-import { Loader2, AlertCircle, AlertTriangle, Info, Wand2 } from "lucide-react";
+import { Loader2, AlertCircle, AlertTriangle, Info, Wand2, Sparkles } from "lucide-react";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { detectMissingLucideImports, detectMissingFramerMotionImports } from "@/lib/autoFixImports";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -10,6 +10,8 @@ interface CodeEditorProps {
   onChange: (value: string | undefined) => void;
   onInlineEdit?: (selectedCode: string, instruction: string, fullContent: string) => Promise<string | null>;
   projectFiles?: { path: string; content: string }[];
+  autocompleteEnabled?: boolean;
+  onAutocompleteToggle?: () => void;
 }
 
 interface DiagnosticCounts {
@@ -35,7 +37,7 @@ const getLanguage = (filename: string): string => {
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
-const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles }: CodeEditorProps) => {
+const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, autocompleteEnabled = true, onAutocompleteToggle }: CodeEditorProps) => {
   const [diagnostics, setDiagnostics] = useState<DiagnosticCounts>({ errors: 0, warnings: 0, info: 0 });
   const [autoFixedIcons, setAutoFixedIcons] = useState<string[]>([]);
   const [autoFixedFramer, setAutoFixedFramer] = useState<string[]>([]);
@@ -246,6 +248,10 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles }:
           }
 
           return new Promise((resolve) => {
+            if (!autocompleteEnabled) {
+              resolve({ items: [] });
+              return;
+            }
             autocompleteTimerRef.current = setTimeout(async () => {
               try {
                 // Get surrounding code context
@@ -500,7 +506,7 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles }:
           options={{
             fontSize: 14,
             fontFamily: "'JetBrains Mono', monospace",
-            minimap: { enabled: true, scale: 1 },
+            minimap: { enabled: true, scale: 1, showSlider: "always" },
             scrollBeyondLastLine: false,
             wordWrap: "on",
             lineNumbers: "on",
@@ -522,6 +528,20 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles }:
             renderValidationDecorations: "on",
             glyphMargin: true,
             inlineSuggest: { enabled: true },
+            folding: true,
+            foldingStrategy: "indentation",
+            showFoldingControls: "always",
+            matchBrackets: "always",
+            guides: { bracketPairs: true, indentation: true },
+            multiCursorModifier: "alt",
+            find: { addExtraSpaceOnTop: true, autoFindInSelection: "multiline", seedSearchStringFromSelection: "selection" },
+            linkedEditing: true,
+            renderWhitespace: "selection",
+            columnSelection: true,
+            dragAndDrop: true,
+            snippetSuggestions: "inline",
+            tabCompletion: "on",
+            stickyScroll: { enabled: true },
           }}
         />
       </div>
@@ -619,6 +639,27 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles }:
               </Tooltip>
             </TooltipProvider>
           )}
+          {/* AI Copilot Toggle */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onAutocompleteToggle}
+                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors ${
+                    autocompleteEnabled
+                      ? "text-primary bg-primary/10 hover:bg-primary/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span className="text-[10px] font-medium">Copilot</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>AI Autocomplete: <strong>{autocompleteEnabled ? "ON" : "OFF"}</strong> — Click to toggle</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
