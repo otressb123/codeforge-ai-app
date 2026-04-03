@@ -40,7 +40,7 @@ const getLanguage = (filename: string): string => {
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
-const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, autocompleteEnabled = true, onAutocompleteToggle }: CodeEditorProps) => {
+const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, autocompleteEnabled = true, onAutocompleteToggle, editorTheme = DEFAULT_THEME_ID, onThemeChange }: CodeEditorProps) => {
   const [diagnostics, setDiagnostics] = useState<DiagnosticCounts>({ errors: 0, warnings: 0, info: 0 });
   const [autoFixedIcons, setAutoFixedIcons] = useState<string[]>([]);
   const [autoFixedFramer, setAutoFixedFramer] = useState<string[]>([]);
