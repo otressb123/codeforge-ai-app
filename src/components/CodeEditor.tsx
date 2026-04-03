@@ -58,6 +58,17 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
   const [themePickerOpen, setThemePickerOpen] = useState(false);
   const themePickerRef = useRef<HTMLDivElement>(null);
 
+  // Close theme picker on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (themePickerRef.current && !themePickerRef.current.contains(e.target as Node)) {
+        setThemePickerOpen(false);
+      }
+    };
+    if (themePickerOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [themePickerOpen]);
+
   // Detect auto-fixed imports whenever content changes
   useEffect(() => {
     if (language === "typescriptreact" || language === "typescript" || language === "javascriptreact" || language === "javascript") {

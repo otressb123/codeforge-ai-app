@@ -73,6 +73,7 @@ const IDE = () => {
   const [previewKey, setPreviewKey] = useState(0);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [autocompleteEnabled, setAutocompleteEnabled] = useState(true);
+  const [editorTheme, setEditorTheme] = useState("codeforge-dark");
   const previewRef = useRef<PreviewPanelRef>(null);
   const aiChatRef = useRef<AIChatPanelRef>(null);
   const bottomAiChatRef = useRef<AIChatPanelRef>(null);
