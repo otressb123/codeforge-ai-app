@@ -366,6 +366,15 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
   }, []);
 
   const handleBeforeMount: BeforeMount = (monaco) => {
+    // Register all custom themes
+    MONACO_THEMES.forEach((theme) => {
+      monaco.editor.defineTheme(theme.id, {
+        base: theme.base,
+        inherit: true,
+        rules: theme.rules,
+        colors: theme.colors,
+      });
+    });
     // Configure TypeScript/JavaScript compiler options for JSX support
     monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
       target: monaco.languages.typescript.ScriptTarget.ESNext,
