@@ -1,8 +1,9 @@
 import Editor, { OnMount, BeforeMount } from "@monaco-editor/react";
-import { Loader2, AlertCircle, AlertTriangle, Info, Wand2, Sparkles } from "lucide-react";
+import { Loader2, AlertCircle, AlertTriangle, Info, Wand2, Sparkles, Palette, ChevronDown } from "lucide-react";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { detectMissingLucideImports, detectMissingFramerMotionImports } from "@/lib/autoFixImports";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { MONACO_THEMES, DEFAULT_THEME_ID, type MonacoThemeDefinition } from "@/lib/monacoThemes";
 
 interface CodeEditorProps {
   content: string;
@@ -12,6 +13,8 @@ interface CodeEditorProps {
   projectFiles?: { path: string; content: string }[];
   autocompleteEnabled?: boolean;
   onAutocompleteToggle?: () => void;
+  editorTheme?: string;
+  onThemeChange?: (themeId: string) => void;
 }
 
 interface DiagnosticCounts {
@@ -37,7 +40,7 @@ const getLanguage = (filename: string): string => {
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
-const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, autocompleteEnabled = true, onAutocompleteToggle }: CodeEditorProps) => {
+const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, autocompleteEnabled = true, onAutocompleteToggle, editorTheme = DEFAULT_THEME_ID, onThemeChange }: CodeEditorProps) => {
   const [diagnostics, setDiagnostics] = useState<DiagnosticCounts>({ errors: 0, warnings: 0, info: 0 });
   const [autoFixedIcons, setAutoFixedIcons] = useState<string[]>([]);
   const [autoFixedFramer, setAutoFixedFramer] = useState<string[]>([]);
@@ -52,6 +55,19 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
   const inlineInputRef = useRef<HTMLInputElement>(null);
   const autocompleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [themePickerOpen, setThemePickerOpen] = useState(false);
+  const themePickerRef = useRef<HTMLDivElement>(null);
+
+  // Close theme picker on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (themePickerRef.current && !themePickerRef.current.contains(e.target as Node)) {
+        setThemePickerOpen(false);
+      }
+    };
+    if (themePickerOpen) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [themePickerOpen]);
 
   // Detect auto-fixed imports whenever content changes
   useEffect(() => {
@@ -361,6 +377,15 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
   }, []);
 
   const handleBeforeMount: BeforeMount = (monaco) => {
+    // Register all custom themes
+    MONACO_THEMES.forEach((theme) => {
+      monaco.editor.defineTheme(theme.id, {
+        base: theme.base,
+        inherit: true,
+        rules: theme.rules,
+        colors: theme.colors,
+      });
+    });
     // Configure TypeScript/JavaScript compiler options for JSX support
     monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
       target: monaco.languages.typescript.ScriptTarget.ESNext,
@@ -495,7 +520,7 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
           language={language}
           value={content}
           onChange={onChange}
-          theme="vs-dark"
+          theme={editorTheme}
           beforeMount={handleBeforeMount}
           onMount={handleEditorMount}
           loading={
@@ -673,6 +698,43 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          {/* Theme Picker */}
+          <div className="relative" ref={themePickerRef}>
+            <button
+              onClick={() => setThemePickerOpen((v) => !v)}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+            >
+              <Palette className="w-3 h-3" />
+              <span className="text-[10px] font-medium">
+                {MONACO_THEMES.find((t) => t.id === editorTheme)?.name || "Theme"}
+              </span>
+              <ChevronDown className="w-2.5 h-2.5" />
+            </button>
+            {themePickerOpen && (
+              <div className="absolute bottom-7 right-0 w-48 bg-popover border border-border rounded-lg shadow-xl z-50 py-1 max-h-64 overflow-y-auto">
+                {MONACO_THEMES.map((theme) => (
+                  <button
+                    key={theme.id}
+                    onClick={() => {
+                      onThemeChange?.(theme.id);
+                      setThemePickerOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors ${
+                      editorTheme === theme.id
+                        ? "bg-primary/20 text-primary"
+                        : "text-foreground hover:bg-secondary/50"
+                    }`}
+                  >
+                    <span>{theme.icon}</span>
+                    <span className="font-medium">{theme.name}</span>
+                    {editorTheme === theme.id && (
+                      <span className="ml-auto text-[10px] text-primary">✓</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <span className="text-muted-foreground">{language}</span>
         </div>
       </div>
