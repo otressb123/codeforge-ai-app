@@ -55,6 +55,8 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
   const inlineInputRef = useRef<HTMLInputElement>(null);
   const autocompleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [themePickerOpen, setThemePickerOpen] = useState(false);
+  const themePickerRef = useRef<HTMLDivElement>(null);
 
   // Detect auto-fixed imports whenever content changes
   useEffect(() => {
