@@ -1,8 +1,9 @@
 import Editor, { OnMount, BeforeMount } from "@monaco-editor/react";
-import { Loader2, AlertCircle, AlertTriangle, Info, Wand2, Sparkles } from "lucide-react";
+import { Loader2, AlertCircle, AlertTriangle, Info, Wand2, Sparkles, Palette, ChevronDown } from "lucide-react";
 import { useState, useCallback, useEffect, useRef } from "react";
 import { detectMissingLucideImports, detectMissingFramerMotionImports } from "@/lib/autoFixImports";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { MONACO_THEMES, DEFAULT_THEME_ID, type MonacoThemeDefinition } from "@/lib/monacoThemes";
 
 interface CodeEditorProps {
   content: string;
@@ -12,6 +13,8 @@ interface CodeEditorProps {
   projectFiles?: { path: string; content: string }[];
   autocompleteEnabled?: boolean;
   onAutocompleteToggle?: () => void;
+  editorTheme?: string;
+  onThemeChange?: (themeId: string) => void;
 }
 
 interface DiagnosticCounts {
