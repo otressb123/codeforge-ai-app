@@ -687,6 +687,43 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          {/* Theme Picker */}
+          <div className="relative" ref={themePickerRef}>
+            <button
+              onClick={() => setThemePickerOpen((v) => !v)}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+            >
+              <Palette className="w-3 h-3" />
+              <span className="text-[10px] font-medium">
+                {MONACO_THEMES.find((t) => t.id === editorTheme)?.name || "Theme"}
+              </span>
+              <ChevronDown className="w-2.5 h-2.5" />
+            </button>
+            {themePickerOpen && (
+              <div className="absolute bottom-7 right-0 w-48 bg-popover border border-border rounded-lg shadow-xl z-50 py-1 max-h-64 overflow-y-auto">
+                {MONACO_THEMES.map((theme) => (
+                  <button
+                    key={theme.id}
+                    onClick={() => {
+                      onThemeChange?.(theme.id);
+                      setThemePickerOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs transition-colors ${
+                      editorTheme === theme.id
+                        ? "bg-primary/20 text-primary"
+                        : "text-foreground hover:bg-secondary/50"
+                    }`}
+                  >
+                    <span>{theme.icon}</span>
+                    <span className="font-medium">{theme.name}</span>
+                    {editorTheme === theme.id && (
+                      <span className="ml-auto text-[10px] text-primary">✓</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <span className="text-muted-foreground">{language}</span>
         </div>
       </div>
