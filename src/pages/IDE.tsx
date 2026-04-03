@@ -594,6 +594,8 @@ const IDE = () => {
                           onChange={handleCodeChange}
                           autocompleteEnabled={autocompleteEnabled}
                           onAutocompleteToggle={() => setAutocompleteEnabled(prev => !prev)}
+                          editorTheme={editorTheme}
+                          onThemeChange={setEditorTheme}
                         />
                       </div>
                     </div>
