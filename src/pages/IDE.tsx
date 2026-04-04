@@ -691,6 +691,13 @@ const IDE = () => {
         onOpenTerminal={() => setActiveTab("terminal")}
         onRun={handleRun}
       />
+
+      {/* Status Bar */}
+      <StatusBar
+        activeFile={activeFile}
+        lineCount={currentFile?.content.split("\n").length}
+        isAIEnabled={autocompleteEnabled}
+      />
     </div>
   );
 };
