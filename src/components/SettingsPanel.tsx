@@ -38,12 +38,12 @@ const SettingsPanel = ({ onOpenGitHub, onExport, isGitHubConnected, showMinimap 
             
             <div className="flex items-center justify-between">
               <Label htmlFor="wordwrap" className="text-sm">Word Wrap</Label>
-              <Switch id="wordwrap" defaultChecked />
+              <Switch id="wordwrap" checked={wordWrap} onCheckedChange={onWordWrapToggle} />
             </div>
             
             <div className="flex items-center justify-between">
               <Label htmlFor="linenumbers" className="text-sm">Line Numbers</Label>
-              <Switch id="linenumbers" defaultChecked />
+              <Switch id="linenumbers" checked={lineNumbers} onCheckedChange={onLineNumbersToggle} />
             </div>
           </div>
 

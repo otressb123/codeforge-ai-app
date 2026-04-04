@@ -606,6 +606,8 @@ const IDE = () => {
                           editorTheme={editorTheme}
                           onThemeChange={setEditorTheme}
                           showMinimap={showMinimap}
+                          wordWrap={wordWrap}
+                          lineNumbers={lineNumbers}
                         />
                       </div>
                     </div>
