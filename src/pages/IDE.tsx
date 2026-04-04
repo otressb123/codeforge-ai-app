@@ -599,6 +599,7 @@ const IDE = () => {
                           onAutocompleteToggle={() => setAutocompleteEnabled(prev => !prev)}
                           editorTheme={editorTheme}
                           onThemeChange={setEditorTheme}
+                          showMinimap={showMinimap}
                         />
                       </div>
                     </div>
