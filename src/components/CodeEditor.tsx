@@ -15,6 +15,7 @@ interface CodeEditorProps {
   onAutocompleteToggle?: () => void;
   editorTheme?: string;
   onThemeChange?: (themeId: string) => void;
+  showMinimap?: boolean;
 }
 
 interface DiagnosticCounts {
