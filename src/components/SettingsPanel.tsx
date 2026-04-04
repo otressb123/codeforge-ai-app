@@ -6,6 +6,7 @@ import { Github, Download, Cloud } from "lucide-react";
 
 interface SettingsPanelProps {
   onOpenGitHub?: () => void;
+  onOpenGitLab?: () => void;
   onExport?: () => void;
   isGitHubConnected?: boolean;
   showMinimap?: boolean;
