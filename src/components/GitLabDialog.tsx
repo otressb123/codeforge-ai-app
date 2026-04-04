@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GitBranch, ExternalLink, Upload, Download, Link, Unlink } from "lucide-react";
+import { GitBranch, Upload, Download, Link, Unlink } from "lucide-react";
 
 interface GitLabDialogProps {
   open: boolean;
