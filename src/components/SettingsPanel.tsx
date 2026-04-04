@@ -17,7 +17,7 @@ interface SettingsPanelProps {
   onLineNumbersToggle?: (value: boolean) => void;
 }
 
-const SettingsPanel = ({ onOpenGitHub, onExport, isGitHubConnected, showMinimap = true, onMinimapToggle, wordWrap = true, onWordWrapToggle, lineNumbers = true, onLineNumbersToggle }: SettingsPanelProps) => {
+const SettingsPanel = ({ onOpenGitHub, onOpenGitLab, onExport, isGitHubConnected, showMinimap = true, onMinimapToggle, wordWrap = true, onWordWrapToggle, lineNumbers = true, onLineNumbersToggle }: SettingsPanelProps) => {
   return (
     <div className="h-full bg-sidebar overflow-y-auto scrollbar-thin">
       <div className="p-3 border-b border-border">
