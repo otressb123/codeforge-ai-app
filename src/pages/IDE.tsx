@@ -519,6 +519,10 @@ const IDE = () => {
             isGitHubConnected={isGitHubConnected}
             showMinimap={showMinimap}
             onMinimapToggle={setShowMinimap}
+            wordWrap={wordWrap}
+            onWordWrapToggle={setWordWrap}
+            lineNumbers={lineNumbers}
+            onLineNumbersToggle={setLineNumbers}
           />
         );
     }
