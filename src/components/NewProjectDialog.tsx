@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FileCode, Globe, Palette, Zap } from "lucide-react";
+import { FileCode, Globe, Palette, Zap, LayoutDashboard, Gamepad2, ShoppingCart, Bot } from "lucide-react";
 import { motion } from "framer-motion";
 import { FileNode } from "./FileExplorer";
 
