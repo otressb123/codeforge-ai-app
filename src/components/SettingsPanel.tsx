@@ -8,9 +8,11 @@ interface SettingsPanelProps {
   onOpenGitHub?: () => void;
   onExport?: () => void;
   isGitHubConnected?: boolean;
+  showMinimap?: boolean;
+  onMinimapToggle?: (value: boolean) => void;
 }
 
-const SettingsPanel = ({ onOpenGitHub, onExport, isGitHubConnected }: SettingsPanelProps) => {
+const SettingsPanel = ({ onOpenGitHub, onExport, isGitHubConnected, showMinimap = true, onMinimapToggle }: SettingsPanelProps) => {
   return (
     <div className="h-full bg-sidebar overflow-y-auto scrollbar-thin">
       <div className="p-3 border-b border-border">
