@@ -16,6 +16,8 @@ interface CodeEditorProps {
   editorTheme?: string;
   onThemeChange?: (themeId: string) => void;
   showMinimap?: boolean;
+  wordWrap?: boolean;
+  lineNumbers?: boolean;
 }
 
 interface DiagnosticCounts {
