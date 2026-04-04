@@ -532,7 +532,7 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
           options={{
             fontSize: 14,
             fontFamily: "'JetBrains Mono', monospace",
-            minimap: { enabled: true, scale: 1, showSlider: "always" },
+            minimap: { enabled: showMinimap !== false, scale: 1, showSlider: "always" },
             scrollBeyondLastLine: false,
             wordWrap: "on",
             lineNumbers: "on",
