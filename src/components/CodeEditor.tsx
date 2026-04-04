@@ -16,6 +16,8 @@ interface CodeEditorProps {
   editorTheme?: string;
   onThemeChange?: (themeId: string) => void;
   showMinimap?: boolean;
+  wordWrap?: boolean;
+  lineNumbers?: boolean;
 }
 
 interface DiagnosticCounts {
@@ -41,7 +43,7 @@ const getLanguage = (filename: string): string => {
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
-const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, autocompleteEnabled = true, onAutocompleteToggle, editorTheme = DEFAULT_THEME_ID, onThemeChange, showMinimap = true }: CodeEditorProps) => {
+const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, autocompleteEnabled = true, onAutocompleteToggle, editorTheme = DEFAULT_THEME_ID, onThemeChange, showMinimap = true, wordWrap = true, lineNumbers = true }: CodeEditorProps) => {
   const [diagnostics, setDiagnostics] = useState<DiagnosticCounts>({ errors: 0, warnings: 0, info: 0 });
   const [autoFixedIcons, setAutoFixedIcons] = useState<string[]>([]);
   const [autoFixedFramer, setAutoFixedFramer] = useState<string[]>([]);
@@ -534,8 +536,8 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
             fontFamily: "'JetBrains Mono', monospace",
             minimap: { enabled: showMinimap !== false, scale: 1, showSlider: "always" },
             scrollBeyondLastLine: false,
-            wordWrap: "on",
-            lineNumbers: "on",
+            wordWrap: wordWrap ? "on" : "off",
+            lineNumbers: lineNumbers ? "on" : "off",
             renderLineHighlight: "all",
             cursorBlinking: "smooth",
             cursorSmoothCaretAnimation: "on",

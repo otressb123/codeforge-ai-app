@@ -75,6 +75,8 @@ const IDE = () => {
   const [autocompleteEnabled, setAutocompleteEnabled] = useState(true);
   const [editorTheme, setEditorTheme] = useState("codeforge-dark");
   const [showMinimap, setShowMinimap] = useState(true);
+  const [wordWrap, setWordWrap] = useState(true);
+  const [lineNumbers, setLineNumbers] = useState(true);
   const previewRef = useRef<PreviewPanelRef>(null);
   const aiChatRef = useRef<AIChatPanelRef>(null);
   const bottomAiChatRef = useRef<AIChatPanelRef>(null);
@@ -517,6 +519,10 @@ const IDE = () => {
             isGitHubConnected={isGitHubConnected}
             showMinimap={showMinimap}
             onMinimapToggle={setShowMinimap}
+            wordWrap={wordWrap}
+            onWordWrapToggle={setWordWrap}
+            lineNumbers={lineNumbers}
+            onLineNumbersToggle={setLineNumbers}
           />
         );
     }
@@ -600,6 +606,8 @@ const IDE = () => {
                           editorTheme={editorTheme}
                           onThemeChange={setEditorTheme}
                           showMinimap={showMinimap}
+                          wordWrap={wordWrap}
+                          lineNumbers={lineNumbers}
                         />
                       </div>
                     </div>
