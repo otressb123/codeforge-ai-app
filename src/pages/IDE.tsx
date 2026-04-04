@@ -515,6 +515,8 @@ const IDE = () => {
             onOpenGitHub={() => setIsGitHubOpen(true)}
             onExport={() => setIsExportImportOpen(true)}
             isGitHubConnected={isGitHubConnected}
+            showMinimap={showMinimap}
+            onMinimapToggle={setShowMinimap}
           />
         );
     }
