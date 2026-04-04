@@ -15,8 +15,10 @@ import GitPanel from "@/components/GitPanel";
 import BreadcrumbBar from "@/components/BreadcrumbBar";
 import NewProjectDialog from "@/components/NewProjectDialog";
 import GitHubDialog from "@/components/GitHubDialog";
+import GitLabDialog from "@/components/GitLabDialog";
 import ExportImportDialog from "@/components/ExportImportDialog";
 import CommandPalette from "@/components/CommandPalette";
+import StatusBar from "@/components/StatusBar";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -68,6 +70,7 @@ const IDE = () => {
   const [projectName, setProjectName] = useState("my-awesome-app");
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
   const [isGitHubOpen, setIsGitHubOpen] = useState(false);
+  const [isGitLabOpen, setIsGitLabOpen] = useState(false);
   const [isExportImportOpen, setIsExportImportOpen] = useState(false);
   const [isGitHubConnected, setIsGitHubConnected] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
@@ -515,6 +518,7 @@ const IDE = () => {
         return (
           <SettingsPanel
             onOpenGitHub={() => setIsGitHubOpen(true)}
+            onOpenGitLab={() => setIsGitLabOpen(true)}
             onExport={() => setIsExportImportOpen(true)}
             isGitHubConnected={isGitHubConnected}
             showMinimap={showMinimap}
@@ -553,6 +557,15 @@ const IDE = () => {
         onConnect={handleGitHubConnect}
         onPush={handleGitHubPush}
         onPull={handleGitHubPull}
+      />
+
+      <GitLabDialog
+        open={isGitLabOpen}
+        onOpenChange={setIsGitLabOpen}
+        projectName={projectName}
+        onConnect={() => toast.success("Connected to GitLab!")}
+        onPush={(msg) => toast.success(`Pushed to GitLab: ${msg}`)}
+        onPull={() => toast.success("Pulled from GitLab!")}
       />
 
       <ExportImportDialog
@@ -678,6 +691,13 @@ const IDE = () => {
         onOpenSearch={() => setActiveTab("search")}
         onOpenTerminal={() => setActiveTab("terminal")}
         onRun={handleRun}
+      />
+
+      {/* Status Bar */}
+      <StatusBar
+        activeFile={activeFile}
+        lineCount={currentFile?.content.split("\n").length}
+        isAIEnabled={autocompleteEnabled}
       />
     </div>
   );

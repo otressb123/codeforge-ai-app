@@ -2,10 +2,11 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { Github, Download, Cloud } from "lucide-react";
+import { Github, Download, Cloud, GitBranch } from "lucide-react";
 
 interface SettingsPanelProps {
   onOpenGitHub?: () => void;
+  onOpenGitLab?: () => void;
   onExport?: () => void;
   isGitHubConnected?: boolean;
   showMinimap?: boolean;
@@ -16,7 +17,7 @@ interface SettingsPanelProps {
   onLineNumbersToggle?: (value: boolean) => void;
 }
 
-const SettingsPanel = ({ onOpenGitHub, onExport, isGitHubConnected, showMinimap = true, onMinimapToggle, wordWrap = true, onWordWrapToggle, lineNumbers = true, onLineNumbersToggle }: SettingsPanelProps) => {
+const SettingsPanel = ({ onOpenGitHub, onOpenGitLab, onExport, isGitHubConnected, showMinimap = true, onMinimapToggle, wordWrap = true, onWordWrapToggle, lineNumbers = true, onLineNumbersToggle }: SettingsPanelProps) => {
   return (
     <div className="h-full bg-sidebar overflow-y-auto scrollbar-thin">
       <div className="p-3 border-b border-border">
@@ -93,6 +94,16 @@ const SettingsPanel = ({ onOpenGitHub, onExport, isGitHubConnected, showMinimap 
               ) : (
                 <span className="text-xs text-muted-foreground">Not connected</span>
               )}
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              onClick={onOpenGitLab}
+            >
+              <GitBranch className="w-4 h-4" />
+              <span className="flex-1 text-left">GitLab</span>
+              <span className="text-xs text-muted-foreground">Connect</span>
             </Button>
           </div>
         </div>
