@@ -70,6 +70,7 @@ const IDE = () => {
   const [projectName, setProjectName] = useState("my-awesome-app");
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
   const [isGitHubOpen, setIsGitHubOpen] = useState(false);
+  const [isGitLabOpen, setIsGitLabOpen] = useState(false);
   const [isExportImportOpen, setIsExportImportOpen] = useState(false);
   const [isGitHubConnected, setIsGitHubConnected] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
