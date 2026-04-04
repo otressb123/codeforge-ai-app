@@ -95,6 +95,16 @@ const SettingsPanel = ({ onOpenGitHub, onOpenGitLab, onExport, isGitHubConnected
                 <span className="text-xs text-muted-foreground">Not connected</span>
               )}
             </Button>
+
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2"
+              onClick={onOpenGitLab}
+            >
+              <GitBranch className="w-4 h-4" />
+              <span className="flex-1 text-left">GitLab</span>
+              <span className="text-xs text-muted-foreground">Connect</span>
+            </Button>
           </div>
         </div>
 
