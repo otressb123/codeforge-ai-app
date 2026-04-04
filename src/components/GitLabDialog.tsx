@@ -14,7 +14,7 @@ interface GitLabDialogProps {
   onPull?: () => void;
 }
 
-const GitLabDialog = ({ open, onOpenChange, projectName, onConnect, onPush, onPull }: GitLabDialogProps) => {
+const GitLabDialog = ({ open, onOpenChange, onConnect, onPush, onPull }: GitLabDialogProps) => {
   const [isConnected, setIsConnected] = useState(false);
   const [repoUrl, setRepoUrl] = useState("");
   const [commitMessage, setCommitMessage] = useState("");

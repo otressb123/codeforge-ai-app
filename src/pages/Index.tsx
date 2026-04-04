@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Zap, Code, Bot, Sparkles, ArrowRight, Globe, Layers, Terminal, Wifi, WifiOff, Gamepad2, LayoutDashboard, Rocket, ChevronRight, Star, Users, GitBranch } from "lucide-react";
+import { motion } from "framer-motion";
+import { Zap, Code, Bot, Sparkles, ArrowRight, Globe, Wifi, WifiOff, Gamepad2, LayoutDashboard, Rocket, ChevronRight, GitBranch } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
