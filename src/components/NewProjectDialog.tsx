@@ -519,7 +519,7 @@ const NewProjectDialog = ({ open, onOpenChange, onCreateProject }: NewProjectDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] bg-sidebar border-border">
+      <DialogContent className="sm:max-w-[700px] bg-sidebar border-border max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">Create New Project</DialogTitle>
           <DialogDescription>Choose a template and name for your project</DialogDescription>
