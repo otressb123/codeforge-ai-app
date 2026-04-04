@@ -558,6 +558,15 @@ const IDE = () => {
         onPull={handleGitHubPull}
       />
 
+      <GitLabDialog
+        open={isGitLabOpen}
+        onOpenChange={setIsGitLabOpen}
+        projectName={projectName}
+        onConnect={() => toast.success("Connected to GitLab!")}
+        onPush={(msg) => toast.success(`Pushed to GitLab: ${msg}`)}
+        onPull={() => toast.success("Pulled from GitLab!")}
+      />
+
       <ExportImportDialog
         open={isExportImportOpen}
         onOpenChange={setIsExportImportOpen}
