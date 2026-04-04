@@ -2,7 +2,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { Github, Download, Cloud } from "lucide-react";
+import { Github, Download, Cloud, GitBranch } from "lucide-react";
 
 interface SettingsPanelProps {
   onOpenGitHub?: () => void;
