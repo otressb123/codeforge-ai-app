@@ -74,6 +74,7 @@ const IDE = () => {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [autocompleteEnabled, setAutocompleteEnabled] = useState(true);
   const [editorTheme, setEditorTheme] = useState("codeforge-dark");
+  const [showMinimap, setShowMinimap] = useState(true);
   const previewRef = useRef<PreviewPanelRef>(null);
   const aiChatRef = useRef<AIChatPanelRef>(null);
   const bottomAiChatRef = useRef<AIChatPanelRef>(null);
@@ -514,6 +515,8 @@ const IDE = () => {
             onOpenGitHub={() => setIsGitHubOpen(true)}
             onExport={() => setIsExportImportOpen(true)}
             isGitHubConnected={isGitHubConnected}
+            showMinimap={showMinimap}
+            onMinimapToggle={setShowMinimap}
           />
         );
     }
@@ -596,6 +599,7 @@ const IDE = () => {
                           onAutocompleteToggle={() => setAutocompleteEnabled(prev => !prev)}
                           editorTheme={editorTheme}
                           onThemeChange={setEditorTheme}
+                          showMinimap={showMinimap}
                         />
                       </div>
                     </div>
