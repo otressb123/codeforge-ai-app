@@ -539,7 +539,7 @@ const NewProjectDialog = ({ open, onOpenChange, onCreateProject }: NewProjectDia
 
           <div className="space-y-2">
             <Label>Template</Label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {templates.map((template) => (
                 <motion.div
                   key={template.id}
