@@ -518,6 +518,7 @@ const IDE = () => {
         return (
           <SettingsPanel
             onOpenGitHub={() => setIsGitHubOpen(true)}
+            onOpenGitLab={() => setIsGitLabOpen(true)}
             onExport={() => setIsExportImportOpen(true)}
             isGitHubConnected={isGitHubConnected}
             showMinimap={showMinimap}
