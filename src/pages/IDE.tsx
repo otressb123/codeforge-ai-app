@@ -24,7 +24,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
-type SidebarTab = "files" | "search" | "ai" | "extensions" | "git" | "terminal" | "settings";
+type SidebarTab = "files" | "search" | "ai" | "components" | "extensions" | "git" | "terminal" | "settings";
 
 interface OpenFile {
   path: string;
