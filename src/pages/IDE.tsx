@@ -12,6 +12,7 @@ import TerminalPanel from "@/components/TerminalPanel";
 import SettingsPanel from "@/components/SettingsPanel";
 import ExtensionsPanel from "@/components/ExtensionsPanel";
 import GitPanel from "@/components/GitPanel";
+import ComponentLibrary from "@/components/ComponentLibrary";
 import BreadcrumbBar from "@/components/BreadcrumbBar";
 import NewProjectDialog from "@/components/NewProjectDialog";
 import GitHubDialog from "@/components/GitHubDialog";
