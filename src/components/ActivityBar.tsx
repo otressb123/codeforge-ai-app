@@ -1,7 +1,7 @@
 import { Files, Bot, Play, Terminal, Settings, Search, Puzzle, GitBranch, Layers } from "lucide-react";
 import { motion } from "framer-motion";
 
-type SidebarTab = "files" | "search" | "ai" | "extensions" | "git" | "terminal" | "settings";
+type SidebarTab = "files" | "search" | "ai" | "components" | "extensions" | "git" | "terminal" | "settings";
 
 interface ActivityBarProps {
   activeTab: SidebarTab;
