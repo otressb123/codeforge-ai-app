@@ -12,6 +12,7 @@ import TerminalPanel from "@/components/TerminalPanel";
 import SettingsPanel from "@/components/SettingsPanel";
 import ExtensionsPanel from "@/components/ExtensionsPanel";
 import GitPanel from "@/components/GitPanel";
+import ComponentLibrary from "@/components/ComponentLibrary";
 import BreadcrumbBar from "@/components/BreadcrumbBar";
 import NewProjectDialog from "@/components/NewProjectDialog";
 import GitHubDialog from "@/components/GitHubDialog";
@@ -23,7 +24,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
-type SidebarTab = "files" | "search" | "ai" | "extensions" | "git" | "terminal" | "settings";
+type SidebarTab = "files" | "search" | "ai" | "components" | "extensions" | "git" | "terminal" | "settings";
 
 interface OpenFile {
   path: string;
@@ -508,6 +509,8 @@ const IDE = () => {
         return <SearchPanel />;
       case "ai":
         return <AIChatPanel ref={aiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} />;
+      case "components":
+        return <ComponentLibrary onInsertComponent={handleFilesGenerated} />;
       case "git":
         return <GitPanel />;
       case "extensions":

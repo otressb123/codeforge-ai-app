@@ -69,24 +69,26 @@ const flattenFileTree = (nodes: FileNode[], basePath = ""): ProjectFile[] => {
   return result;
 };
 
+const QUICK_BUILDS = [
+  { emoji: "🌐", label: "Landing Page", prompt: "Build me a modern SaaS landing page with a gradient hero section, feature grid, pricing cards, testimonials, and a footer. Make it beautiful with animations and a dark theme." },
+  { emoji: "🛒", label: "E-Commerce", prompt: "Build me a full e-commerce store with product grid, shopping cart, product detail pages, search, filters, and a checkout flow. Include realistic mock products with images and prices." },
+  { emoji: "📊", label: "Dashboard", prompt: "Build me an analytics dashboard with sidebar navigation, stat cards, charts (bar, line, pie), a data table with sorting, and a dark theme with gradients." },
+  { emoji: "💬", label: "Chat App", prompt: "Build me a real-time chat application with a sidebar showing conversations, message bubbles, typing indicators, emoji reactions, and user avatars." },
+  { emoji: "🎮", label: "Browser Game", prompt: "Build me a fun browser game using HTML5 Canvas - a space shooter with a starfield background, player ship, enemies, bullets, score tracking, and game over screen." },
+  { emoji: "📱", label: "Social Media", prompt: "Build me an Instagram-like social media app with a feed of posts, likes, comments, stories at the top, user profiles, and a bottom navigation bar." },
+  { emoji: "📝", label: "Blog/Portfolio", prompt: "Build me a personal portfolio/blog website with a hero section, about me, project showcase cards, blog post list, and contact form. Clean minimal design." },
+  { emoji: "🎵", label: "Music Player", prompt: "Build me a Spotify-like music player with album art, play/pause/skip controls, a progress bar, playlist sidebar, and search. Dark theme with vibrant accent colors." },
+];
+
 const WELCOME_MESSAGE: Message = {
   role: "assistant",
-  content: `🧠 **CodeForge AI** — I remember everything we build together.
+  content: `🧠 **CodeForge AI** — Your AI coding partner with full project awareness.
 
-I'm not just a chatbot — I'm your **AI coding partner** with full project awareness. I can see your files, your preview, and I remember our entire conversation.
+**Quick actions:** Use the buttons below or describe what you want to build!
 
-**What I can do:**
-• 🏗️ Build **complete apps** from a description — social media, e-commerce, dashboards, games
-• 🎨 Design with **creative vision** — gradients, animations, glass morphism, dark themes
-• 🔧 **Fix bugs** by analyzing your code and preview screenshots
-• 🔄 **Iterate** on what exists — I never start from scratch unless you ask
-• 📸 **See your preview** — I analyze what's rendered and suggest improvements
-
-**Try me:**
-• "Build a Spotify-like music player"
-• "Create an Instagram clone with stories"
-• "Make a dashboard with charts and stats"
-• "Fix the button — it's not working"
+• 🏗️ **"Build me a..."** — Describe any website or app and I'll create all the files
+• 🔧 **Fix & improve** — I see your code and preview, just tell me what's wrong
+• 📸 **Visual check** — I can screenshot your preview and suggest improvements
 
 What shall we build? 🚀`,
 };
@@ -583,6 +585,27 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Quick Build Buttons - shown when few messages */}
+      {messages.length <= 2 && !isLoading && (
+        <div className="px-3 py-2 border-t border-border">
+          <p className="text-[10px] text-muted-foreground mb-2 font-medium">⚡ Quick Build</p>
+          <div className="flex flex-wrap gap-1.5">
+            {QUICK_BUILDS.map((qb, i) => (
+              <motion.button
+                key={i}
+                onClick={() => { setInput(qb.prompt); }}
+                className="px-2.5 py-1.5 rounded-lg bg-secondary/50 hover:bg-primary/20 border border-border hover:border-primary/30 text-[11px] text-muted-foreground hover:text-foreground transition-all flex items-center gap-1.5"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+              >
+                <span>{qb.emoji}</span>
+                <span>{qb.label}</span>
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Input */}
       <div className="p-3 border-t border-border space-y-2">
