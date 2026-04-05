@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Layout, Navigation, Image, Type, CreditCard, MessageSquare, 
+  Layout, Navigation, Type, CreditCard, MessageSquare, 
   Star, Users, Mail, ChevronDown, ChevronRight, Copy, Check,
-  Layers, Grid3X3, FileText, ShoppingCart, BarChart3, Menu
+  Layers, Grid3X3, FileText, Menu
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 interface ComponentTemplate {
