@@ -586,6 +586,27 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Quick Build Buttons - shown when few messages */}
+      {messages.length <= 2 && !isLoading && (
+        <div className="px-3 py-2 border-t border-border">
+          <p className="text-[10px] text-muted-foreground mb-2 font-medium">⚡ Quick Build</p>
+          <div className="flex flex-wrap gap-1.5">
+            {QUICK_BUILDS.map((qb, i) => (
+              <motion.button
+                key={i}
+                onClick={() => { setInput(qb.prompt); }}
+                className="px-2.5 py-1.5 rounded-lg bg-secondary/50 hover:bg-primary/20 border border-border hover:border-primary/30 text-[11px] text-muted-foreground hover:text-foreground transition-all flex items-center gap-1.5"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+              >
+                <span>{qb.emoji}</span>
+                <span>{qb.label}</span>
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Input */}
       <div className="p-3 border-t border-border space-y-2">
         {/* Context indicators */}
