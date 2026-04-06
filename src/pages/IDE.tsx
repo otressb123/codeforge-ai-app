@@ -567,6 +567,7 @@ const IDE = () => {
         onNewProject={() => setIsNewProjectOpen(true)}
         onGitHub={() => setIsGitHubOpen(true)}
         onExportImport={() => setIsExportImportOpen(true)}
+        onProductionExport={() => setIsProductionExportOpen(true)}
         isGitHubConnected={isGitHubConnected}
       />
       
