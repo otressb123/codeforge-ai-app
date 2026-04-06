@@ -76,6 +76,7 @@ const IDE = () => {
   const [isGitHubOpen, setIsGitHubOpen] = useState(false);
   const [isGitLabOpen, setIsGitLabOpen] = useState(false);
   const [isExportImportOpen, setIsExportImportOpen] = useState(false);
+  const [isProductionExportOpen, setIsProductionExportOpen] = useState(false);
   const [isGitHubConnected, setIsGitHubConnected] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
