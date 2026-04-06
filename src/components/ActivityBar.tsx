@@ -1,4 +1,4 @@
-import { Files, Bot, Play, Terminal, Settings, Search, Puzzle, GitBranch, Layers } from "lucide-react";
+import { Files, Bot, Play, Terminal, Settings, Search, Puzzle, GitBranch, Layers, FileText, Image } from "lucide-react";
 import { motion } from "framer-motion";
 
 type SidebarTab = "files" | "search" | "ai" | "components" | "extensions" | "git" | "terminal" | "settings";
