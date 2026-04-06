@@ -515,6 +515,25 @@ const IDE = () => {
         return <AIChatPanel ref={aiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} />;
       case "components":
         return <ComponentLibrary onInsertComponent={handleFilesGenerated} />;
+      case "pages":
+        return (
+          <PageManager
+            onPagesChanged={() => {}}
+            onGenerateRouting={(pages) => {
+              // Generate routing prompt for AI
+              const pageList = pages.map(p => `${p.name} (${p.path})`).join(", ");
+              const ref = aiChatRef.current || bottomAiChatRef.current;
+              if (ref) {
+                setActiveTab("ai");
+                const prompt = `Build me a multi-page React website with these pages: ${pageList}. Include a shared navbar with links to all pages, a router setup in App.tsx, and create each page component with relevant content. Make it beautiful with a cohesive design.`;
+                // Trigger via auto-fix mechanism (reuse the flow)
+                ref.triggerAutoFix(`USER_REQUEST: ${prompt}`);
+              }
+            }}
+          />
+        );
+      case "assets":
+        return <AssetManager onInsertCode={handleAICodeGenerated} />;
       case "git":
         return <GitPanel />;
       case "extensions":
