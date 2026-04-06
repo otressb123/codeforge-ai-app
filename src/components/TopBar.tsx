@@ -1,4 +1,4 @@
-import { Play, Save, Settings, Github, Plus, Zap, Command, Download, Upload } from "lucide-react";
+import { Play, Save, Settings, Github, Plus, Zap, Command, Download, Upload, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
