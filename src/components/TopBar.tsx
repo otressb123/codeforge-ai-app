@@ -91,6 +91,21 @@ const TopBar = ({ projectName, onRun, onSave, onNewProject, onGitHub, onExportIm
         <div className="flex items-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-primary/30 hover:border-primary text-primary hover:bg-primary/10"
+                onClick={onProductionExport}
+              >
+                <Rocket className="w-4 h-4" />
+                <span className="hidden sm:inline">Deploy</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Export for production deployment</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onExportImport}>
                 <Download className="w-4 h-4" />
               </Button>
