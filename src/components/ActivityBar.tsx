@@ -14,6 +14,8 @@ const ActivityBar = ({ activeTab, onTabChange }: ActivityBarProps) => {
     { id: "search" as SidebarTab, icon: Search, label: "Search" },
     { id: "ai" as SidebarTab, icon: Bot, label: "AI Assistant" },
     { id: "components" as SidebarTab, icon: Layers, label: "Components" },
+    { id: "pages" as SidebarTab, icon: FileText, label: "Pages" },
+    { id: "assets" as SidebarTab, icon: Image, label: "Assets" },
     { id: "git" as SidebarTab, icon: GitBranch, label: "Source Control" },
     { id: "extensions" as SidebarTab, icon: Puzzle, label: "Extensions" },
     { id: "terminal" as SidebarTab, icon: Terminal, label: "Terminal" },
