@@ -602,7 +602,13 @@ const IDE = () => {
         onImport={handleImportProject}
       />
 
-      <div className="flex-1 flex overflow-hidden">
+      <ProductionExport
+        open={isProductionExportOpen}
+        onOpenChange={setIsProductionExportOpen}
+        projectName={projectName}
+        files={files}
+      />
+
         <ActivityBar activeTab={activeTab} onTabChange={setActiveTab} />
 
         <ResizablePanelGroup direction="horizontal" className="flex-1">
