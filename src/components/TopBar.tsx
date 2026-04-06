@@ -11,10 +11,11 @@ interface TopBarProps {
   onNewProject?: () => void;
   onGitHub?: () => void;
   onExportImport?: () => void;
+  onProductionExport?: () => void;
   isGitHubConnected?: boolean;
 }
 
-const TopBar = ({ projectName, onRun, onSave, onNewProject, onGitHub, onExportImport, isGitHubConnected }: TopBarProps) => {
+const TopBar = ({ projectName, onRun, onSave, onNewProject, onGitHub, onExportImport, onProductionExport, isGitHubConnected }: TopBarProps) => {
   return (
     <TooltipProvider delayDuration={300}>
       <header className="h-12 bg-sidebar border-b border-border flex items-center justify-between px-4">
