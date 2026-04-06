@@ -609,6 +609,7 @@ const IDE = () => {
         files={files}
       />
 
+      <div className="flex-1 flex overflow-hidden">
         <ActivityBar activeTab={activeTab} onTabChange={setActiveTab} />
 
         <ResizablePanelGroup direction="horizontal" className="flex-1">
