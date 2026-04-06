@@ -13,6 +13,9 @@ import SettingsPanel from "@/components/SettingsPanel";
 import ExtensionsPanel from "@/components/ExtensionsPanel";
 import GitPanel from "@/components/GitPanel";
 import ComponentLibrary from "@/components/ComponentLibrary";
+import PageManager from "@/components/PageManager";
+import AssetManager from "@/components/AssetManager";
+import ProductionExport from "@/components/ProductionExport";
 import BreadcrumbBar from "@/components/BreadcrumbBar";
 import NewProjectDialog from "@/components/NewProjectDialog";
 import GitHubDialog from "@/components/GitHubDialog";
@@ -24,7 +27,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
-type SidebarTab = "files" | "search" | "ai" | "components" | "extensions" | "git" | "terminal" | "settings";
+type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings";
 
 interface OpenFile {
   path: string;
@@ -73,6 +76,7 @@ const IDE = () => {
   const [isGitHubOpen, setIsGitHubOpen] = useState(false);
   const [isGitLabOpen, setIsGitLabOpen] = useState(false);
   const [isExportImportOpen, setIsExportImportOpen] = useState(false);
+  const [isProductionExportOpen, setIsProductionExportOpen] = useState(false);
   const [isGitHubConnected, setIsGitHubConnected] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -511,6 +515,25 @@ const IDE = () => {
         return <AIChatPanel ref={aiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} />;
       case "components":
         return <ComponentLibrary onInsertComponent={handleFilesGenerated} />;
+      case "pages":
+        return (
+          <PageManager
+            onPagesChanged={() => {}}
+            onGenerateRouting={(pages) => {
+              // Generate routing prompt for AI
+              const pageList = pages.map(p => `${p.name} (${p.path})`).join(", ");
+              const ref = aiChatRef.current || bottomAiChatRef.current;
+              if (ref) {
+                setActiveTab("ai");
+                const prompt = `Build me a multi-page React website with these pages: ${pageList}. Include a shared navbar with links to all pages, a router setup in App.tsx, and create each page component with relevant content. Make it beautiful with a cohesive design.`;
+                // Trigger via auto-fix mechanism (reuse the flow)
+                ref.triggerAutoFix(`USER_REQUEST: ${prompt}`);
+              }
+            }}
+          />
+        );
+      case "assets":
+        return <AssetManager onInsertCode={handleAICodeGenerated} />;
       case "git":
         return <GitPanel />;
       case "extensions":
@@ -544,6 +567,7 @@ const IDE = () => {
         onNewProject={() => setIsNewProjectOpen(true)}
         onGitHub={() => setIsGitHubOpen(true)}
         onExportImport={() => setIsExportImportOpen(true)}
+        onProductionExport={() => setIsProductionExportOpen(true)}
         isGitHubConnected={isGitHubConnected}
       />
       
@@ -577,6 +601,13 @@ const IDE = () => {
         projectName={projectName}
         files={files}
         onImport={handleImportProject}
+      />
+
+      <ProductionExport
+        open={isProductionExportOpen}
+        onOpenChange={setIsProductionExportOpen}
+        projectName={projectName}
+        files={files}
       />
 
       <div className="flex-1 flex overflow-hidden">

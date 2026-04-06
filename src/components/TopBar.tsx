@@ -1,4 +1,4 @@
-import { Play, Save, Settings, Github, Plus, Zap, Command, Download, Upload } from "lucide-react";
+import { Play, Save, Settings, Github, Plus, Zap, Command, Download, Upload, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -11,10 +11,11 @@ interface TopBarProps {
   onNewProject?: () => void;
   onGitHub?: () => void;
   onExportImport?: () => void;
+  onProductionExport?: () => void;
   isGitHubConnected?: boolean;
 }
 
-const TopBar = ({ projectName, onRun, onSave, onNewProject, onGitHub, onExportImport, isGitHubConnected }: TopBarProps) => {
+const TopBar = ({ projectName, onRun, onSave, onNewProject, onGitHub, onExportImport, onProductionExport, isGitHubConnected }: TopBarProps) => {
   return (
     <TooltipProvider delayDuration={300}>
       <header className="h-12 bg-sidebar border-b border-border flex items-center justify-between px-4">
@@ -88,6 +89,21 @@ const TopBar = ({ projectName, onRun, onSave, onNewProject, onGitHub, onExportIm
 
         {/* Right: Settings */}
         <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-primary/30 hover:border-primary text-primary hover:bg-primary/10"
+                onClick={onProductionExport}
+              >
+                <Rocket className="w-4 h-4" />
+                <span className="hidden sm:inline">Deploy</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Export for production deployment</TooltipContent>
+          </Tooltip>
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onExportImport}>
