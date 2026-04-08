@@ -114,13 +114,17 @@ const buildModuleSystem = (files: Record<string, string>): string => {
       });
 
       // Remove ALL type/interface declarations (exported or not) with brace-aware parsing
+      // Also handles: extends, generics, multi-line, lowercase first letter types
       {
         let prevCode = "";
-        while (prevCode !== processedCode) {
+        let iterations = 0;
+        while (prevCode !== processedCode && iterations < 10) {
           prevCode = processedCode;
+          iterations++;
           let result = "";
           let idx = 0;
-          const typeRegex = /(?:^|\n)\s*(?:export\s+)?(?:type|interface)\s+[A-Z]\w*[^{;]*\{/g;
+          // Match type/interface with optional generics and extends
+          const typeRegex = /(?:^|\n)\s*(?:export\s+)?(?:type|interface)\s+\w+[^{;]*\{/g;
           let m;
           while ((m = typeRegex.exec(processedCode)) !== null) {
             result += processedCode.substring(idx, m.index);
@@ -140,10 +144,24 @@ const buildModuleSystem = (files: Record<string, string>): string => {
         }
       }
       // Remove single-line type aliases: (export)? type X = ...;
-      processedCode = processedCode.replace(/(?:^|\n)\s*(?:export\s+)?type\s+[A-Z]\w*\s*=\s*[^;]+;/g, "/* type removed */");
+      processedCode = processedCode.replace(/(?:^|\n)\s*(?:export\s+)?type\s+\w+\s*(?:<[^>]*>)?\s*=\s*[^;]+;/g, "/* type removed */");
+      // Remove standalone declare statements
+      processedCode = processedCode.replace(/(?:^|\n)\s*declare\s+[^;]+;/g, "/* declare removed */");
       processedCode = processedCode.replace(/(export\s+)?enum\s+(\w+)\s*\{[^}]*\}/g, (match, exp, name) => {
         return exp ? `const ${name} = {}; __exports.${name} = ${name};` : `const ${name} = {};`;
       });
+      
+      // Remove TypeScript type annotations from variable declarations: const x: Type = ... → const x = ...
+      processedCode = processedCode.replace(/(const|let|var)\s+(\w+)\s*:\s*[A-Z]\w*(?:<[^>]*>)?\s*=/g, "$1 $2 =");
+      // Remove type annotations from function params: (x: Type) → (x)
+      // Handle as const assertions
+      processedCode = processedCode.replace(/\s+as\s+const\b/g, "");
+      // Remove generic type params from function calls: fn<Type>(...) → fn(...)
+      processedCode = processedCode.replace(/(\w+)\s*<[A-Z]\w*(?:\[\])?(?:\s*,\s*[A-Z]\w*(?:\[\])?)*>\s*\(/g, "$1(");
+      // Remove return type annotations: ): Type => → ) => and ): Type { → ) {
+      processedCode = processedCode.replace(/\)\s*:\s*[A-Z]\w*(?:<[^>]*>)?(?:\[\])?\s*(=>|\{)/g, ") $1");
+      // Remove type assertions: (expr as Type) → (expr)
+      processedCode = processedCode.replace(/\bas\s+[A-Z]\w*(?:<[^>]*>)?(?:\[\])?/g, "");
       // Transform relative imports
       processedCode = processedCode.replace(
         /import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"]/g,
@@ -527,7 +545,8 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
         const appPaths = ['/src/App.tsx', '/src/App.jsx', '/App.tsx', '/App.jsx'];
         for (const appPath of appPaths) {
           if (__modules[appPath]) {
-            App = __require(appPath).default;
+            const appModule = __require(appPath);
+            App = appModule.default || appModule.App;
             break;
           }
         }
@@ -538,12 +557,20 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
         }
         
         if (!App && !mainModule) {
-          document.getElementById('root').innerHTML = '<div class="preview-error">No App component found. Make sure you have App.tsx or main.tsx in your project.</div>';
+          document.getElementById('root').innerHTML = '<div class="preview-error">No App component found. Make sure you have App.tsx in your project.</div>';
         }
       }
+      
+      // Safety check: if root is still empty after 500ms, show error
+      setTimeout(function() {
+        var rootEl = document.getElementById('root');
+        if (rootEl && !rootEl.hasChildNodes()) {
+          rootEl.innerHTML = '<div class="preview-error">⚠️ Preview rendered but produced no visible output.\\nThis usually means a runtime error occurred silently.\\nCheck the console logs below for details.</div>';
+        }
+      }, 500);
     } catch (error) {
       console.error('Render error:', error);
-      document.getElementById('root').innerHTML = '<div class="preview-error">Render error: ' + error.message + '</div>';
+      document.getElementById('root').innerHTML = '<div class="preview-error">Render error: ' + error.message + '\\n\\n' + (error.stack || '').split('\\n').slice(0,5).join('\\n') + '</div>';
     }
   </script>
 </body>
