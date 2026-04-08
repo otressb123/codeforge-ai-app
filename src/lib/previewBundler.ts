@@ -525,52 +525,67 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
     
     // Boot the app
     try {
+      console.log('[BUNDLER] Available modules:', Object.keys(__modules));
+      
       // Try main entry points first (they typically call createRoot themselves)
       const entryPoints = ['/src/main.tsx', '/src/index.tsx', '/src/main.jsx', '/src/index.jsx', '/main.tsx', '/index.tsx'];
       let mainModule = null;
+      let usedEntry = null;
       
       for (const entry of entryPoints) {
         if (__modules[entry]) {
-          mainModule = __require(entry);
+          console.log('[BUNDLER] Found entry point:', entry);
+          usedEntry = entry;
+          try {
+            mainModule = __require(entry);
+          } catch(e) {
+            console.error('[BUNDLER] Entry point error:', entry, e);
+          }
           break;
         }
       }
       
-      // If main entry rendered the app, we're done
-      if (mainModule && document.getElementById('root').hasChildNodes()) {
-        // App was rendered by the entry point
-      } else {
-        // Fallback: try App directly
+      // Check if entry point rendered the app
+      var rootRendered = document.getElementById('root').hasChildNodes();
+      console.log('[BUNDLER] Root has children after entry:', rootRendered);
+      
+      if (!rootRendered) {
+        // Fallback: try App directly (skip if entry already tried and failed)
         let App;
         const appPaths = ['/src/App.tsx', '/src/App.jsx', '/App.tsx', '/App.jsx'];
         for (const appPath of appPaths) {
           if (__modules[appPath]) {
-            const appModule = __require(appPath);
-            App = appModule.default || appModule.App;
+            console.log('[BUNDLER] Trying App at:', appPath);
+            try {
+              const appModule = __require(appPath);
+              App = appModule.default || appModule.App;
+              console.log('[BUNDLER] App component found:', typeof App);
+            } catch(e) {
+              console.error('[BUNDLER] App module error:', appPath, e);
+            }
             break;
           }
         }
         
-        if (App && !document.getElementById('root').hasChildNodes()) {
+        if (App) {
+          console.log('[BUNDLER] Rendering App component...');
           const root = ReactDOM.createRoot(document.getElementById('root'));
           root.render(React.createElement(App));
-        }
-        
-        if (!App && !mainModule) {
-          document.getElementById('root').innerHTML = '<div class="preview-error">No App component found. Make sure you have App.tsx in your project.</div>';
+        } else if (!mainModule) {
+          document.getElementById('root').innerHTML = '<div class="preview-error">No App component found. Available modules: ' + Object.keys(__modules).join(', ') + '</div>';
         }
       }
       
-      // Safety check: if root is still empty after 500ms, show error
+      // Safety check: if root is still empty after 1s, show diagnostic
       setTimeout(function() {
         var rootEl = document.getElementById('root');
         if (rootEl && !rootEl.hasChildNodes()) {
-          rootEl.innerHTML = '<div class="preview-error">⚠️ Preview rendered but produced no visible output.\\nThis usually means a runtime error occurred silently.\\nCheck the console logs below for details.</div>';
+          rootEl.innerHTML = '<div class="preview-error">⚠️ Preview rendered but produced no visible output.<br><br>Entry used: ' + (usedEntry || 'none') + '<br>Modules: ' + Object.keys(__modules).join(', ') + '</div>';
         }
-      }, 500);
+      }, 1000);
     } catch (error) {
-      console.error('Render error:', error);
-      document.getElementById('root').innerHTML = '<div class="preview-error">Render error: ' + error.message + '\\n\\n' + (error.stack || '').split('\\n').slice(0,5).join('\\n') + '</div>';
+      console.error('[BUNDLER] Render error:', error);
+      document.getElementById('root').innerHTML = '<div class="preview-error">Render error: ' + error.message + '<br><br>' + (error.stack || '').split('\\n').slice(0,5).join('<br>') + '</div>';
     }
   </script>
 </body>
