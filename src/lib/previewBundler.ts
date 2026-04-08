@@ -545,7 +545,8 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
         const appPaths = ['/src/App.tsx', '/src/App.jsx', '/App.tsx', '/App.jsx'];
         for (const appPath of appPaths) {
           if (__modules[appPath]) {
-            App = __require(appPath).default;
+            const appModule = __require(appPath);
+            App = appModule.default || appModule.App;
             break;
           }
         }
@@ -556,12 +557,20 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
         }
         
         if (!App && !mainModule) {
-          document.getElementById('root').innerHTML = '<div class="preview-error">No App component found. Make sure you have App.tsx or main.tsx in your project.</div>';
+          document.getElementById('root').innerHTML = '<div class="preview-error">No App component found. Make sure you have App.tsx in your project.</div>';
         }
       }
+      
+      // Safety check: if root is still empty after 500ms, show error
+      setTimeout(function() {
+        var rootEl = document.getElementById('root');
+        if (rootEl && !rootEl.hasChildNodes()) {
+          rootEl.innerHTML = '<div class="preview-error">⚠️ Preview rendered but produced no visible output.\\nThis usually means a runtime error occurred silently.\\nCheck the console logs below for details.</div>';
+        }
+      }, 500);
     } catch (error) {
       console.error('Render error:', error);
-      document.getElementById('root').innerHTML = '<div class="preview-error">Render error: ' + error.message + '</div>';
+      document.getElementById('root').innerHTML = '<div class="preview-error">Render error: ' + error.message + '\\n\\n' + (error.stack || '').split('\\n').slice(0,5).join('\\n') + '</div>';
     }
   </script>
 </body>
