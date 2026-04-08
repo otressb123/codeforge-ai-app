@@ -525,67 +525,57 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
     
     // Boot the app
     try {
-      console.log('[BUNDLER] Available modules:', Object.keys(__modules));
+      console.log('[BUNDLER] Modules:', Object.keys(__modules).join(', '));
       
-      // Try main entry points first (they typically call createRoot themselves)
-      const entryPoints = ['/src/main.tsx', '/src/index.tsx', '/src/main.jsx', '/src/index.jsx', '/main.tsx', '/index.tsx'];
-      let mainModule = null;
-      let usedEntry = null;
-      
-      for (const entry of entryPoints) {
-        if (__modules[entry]) {
-          console.log('[BUNDLER] Found entry point:', entry);
-          usedEntry = entry;
+      // Strategy: Skip entry points that call createRoot (they conflict with our boot).
+      // Instead, always find and render App directly.
+      let App = null;
+      const appPaths = ['/src/App.tsx', '/src/App.jsx', '/App.tsx', '/App.jsx'];
+      for (const appPath of appPaths) {
+        if (__modules[appPath]) {
           try {
-            mainModule = __require(entry);
+            const appModule = __require(appPath);
+            App = appModule.default || appModule.App;
+            console.log('[BUNDLER] App found at', appPath, ':', typeof App);
           } catch(e) {
-            console.error('[BUNDLER] Entry point error:', entry, e);
+            console.error('[BUNDLER] App error at ' + appPath + ':', e);
+            document.getElementById('root').innerHTML = '<div class="preview-error">Error loading App: ' + e.message + '</div>';
           }
           break;
         }
       }
       
-      // Check if entry point rendered the app
-      var rootRendered = document.getElementById('root').hasChildNodes();
-      console.log('[BUNDLER] Root has children after entry:', rootRendered);
-      
-      if (!rootRendered) {
-        // Fallback: try App directly (skip if entry already tried and failed)
-        let App;
-        const appPaths = ['/src/App.tsx', '/src/App.jsx', '/App.tsx', '/App.jsx'];
-        for (const appPath of appPaths) {
-          if (__modules[appPath]) {
-            console.log('[BUNDLER] Trying App at:', appPath);
-            try {
-              const appModule = __require(appPath);
-              App = appModule.default || appModule.App;
-              console.log('[BUNDLER] App component found:', typeof App);
-            } catch(e) {
-              console.error('[BUNDLER] App module error:', appPath, e);
+      if (App) {
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+      } else {
+        // No App found — try entry points as last resort
+        const entryPoints = ['/src/main.tsx', '/src/index.tsx', '/src/main.jsx', '/src/index.jsx'];
+        let found = false;
+        for (const entry of entryPoints) {
+          if (__modules[entry]) {
+            console.log('[BUNDLER] Using entry:', entry);
+            try { __require(entry); found = true; } catch(e) {
+              console.error('[BUNDLER] Entry error:', e);
             }
             break;
           }
         }
-        
-        if (App) {
-          console.log('[BUNDLER] Rendering App component...');
-          const root = ReactDOM.createRoot(document.getElementById('root'));
-          root.render(React.createElement(App));
-        } else if (!mainModule) {
-          document.getElementById('root').innerHTML = '<div class="preview-error">No App component found. Available modules: ' + Object.keys(__modules).join(', ') + '</div>';
+        if (!found) {
+          document.getElementById('root').innerHTML = '<div class="preview-error">No App component found.<br>Available modules: ' + Object.keys(__modules).join(', ') + '</div>';
         }
       }
       
-      // Safety check: if root is still empty after 1s, show diagnostic
+      // Safety: show diagnostic if still empty after 2s
       setTimeout(function() {
         var rootEl = document.getElementById('root');
         if (rootEl && !rootEl.hasChildNodes()) {
-          rootEl.innerHTML = '<div class="preview-error">⚠️ Preview rendered but produced no visible output.<br><br>Entry used: ' + (usedEntry || 'none') + '<br>Modules: ' + Object.keys(__modules).join(', ') + '</div>';
+          rootEl.innerHTML = '<div class="preview-error">⚠️ App rendered but produced no visible output.<br>Check console for errors.</div>';
         }
-      }, 1000);
+      }, 2000);
     } catch (error) {
-      console.error('[BUNDLER] Render error:', error);
-      document.getElementById('root').innerHTML = '<div class="preview-error">Render error: ' + error.message + '<br><br>' + (error.stack || '').split('\\n').slice(0,5).join('<br>') + '</div>';
+      console.error('[BUNDLER] Boot error:', error);
+      document.getElementById('root').innerHTML = '<div class="preview-error">Boot error: ' + error.message + '</div>';
     }
   </script>
 </body>
