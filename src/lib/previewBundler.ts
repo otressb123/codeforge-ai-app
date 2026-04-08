@@ -525,52 +525,57 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
     
     // Boot the app
     try {
-      // Try main entry points first (they typically call createRoot themselves)
-      const entryPoints = ['/src/main.tsx', '/src/index.tsx', '/src/main.jsx', '/src/index.jsx', '/main.tsx', '/index.tsx'];
-      let mainModule = null;
+      console.log('[BUNDLER] Modules:', Object.keys(__modules).join(', '));
       
-      for (const entry of entryPoints) {
-        if (__modules[entry]) {
-          mainModule = __require(entry);
+      // Strategy: Skip entry points that call createRoot (they conflict with our boot).
+      // Instead, always find and render App directly.
+      let App = null;
+      const appPaths = ['/src/App.tsx', '/src/App.jsx', '/App.tsx', '/App.jsx'];
+      for (const appPath of appPaths) {
+        if (__modules[appPath]) {
+          try {
+            const appModule = __require(appPath);
+            App = appModule.default || appModule.App;
+            console.log('[BUNDLER] App found at', appPath, ':', typeof App);
+          } catch(e) {
+            console.error('[BUNDLER] App error at ' + appPath + ':', e);
+            document.getElementById('root').innerHTML = '<div class="preview-error">Error loading App: ' + e.message + '</div>';
+          }
           break;
         }
       }
       
-      // If main entry rendered the app, we're done
-      if (mainModule && document.getElementById('root').hasChildNodes()) {
-        // App was rendered by the entry point
+      if (App) {
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
       } else {
-        // Fallback: try App directly
-        let App;
-        const appPaths = ['/src/App.tsx', '/src/App.jsx', '/App.tsx', '/App.jsx'];
-        for (const appPath of appPaths) {
-          if (__modules[appPath]) {
-            const appModule = __require(appPath);
-            App = appModule.default || appModule.App;
+        // No App found — try entry points as last resort
+        const entryPoints = ['/src/main.tsx', '/src/index.tsx', '/src/main.jsx', '/src/index.jsx'];
+        let found = false;
+        for (const entry of entryPoints) {
+          if (__modules[entry]) {
+            console.log('[BUNDLER] Using entry:', entry);
+            try { __require(entry); found = true; } catch(e) {
+              console.error('[BUNDLER] Entry error:', e);
+            }
             break;
           }
         }
-        
-        if (App && !document.getElementById('root').hasChildNodes()) {
-          const root = ReactDOM.createRoot(document.getElementById('root'));
-          root.render(React.createElement(App));
-        }
-        
-        if (!App && !mainModule) {
-          document.getElementById('root').innerHTML = '<div class="preview-error">No App component found. Make sure you have App.tsx in your project.</div>';
+        if (!found) {
+          document.getElementById('root').innerHTML = '<div class="preview-error">No App component found.<br>Available modules: ' + Object.keys(__modules).join(', ') + '</div>';
         }
       }
       
-      // Safety check: if root is still empty after 500ms, show error
+      // Safety: show diagnostic if still empty after 2s
       setTimeout(function() {
         var rootEl = document.getElementById('root');
         if (rootEl && !rootEl.hasChildNodes()) {
-          rootEl.innerHTML = '<div class="preview-error">⚠️ Preview rendered but produced no visible output.\\nThis usually means a runtime error occurred silently.\\nCheck the console logs below for details.</div>';
+          rootEl.innerHTML = '<div class="preview-error">⚠️ App rendered but produced no visible output.<br>Check console for errors.</div>';
         }
-      }, 500);
+      }, 2000);
     } catch (error) {
-      console.error('Render error:', error);
-      document.getElementById('root').innerHTML = '<div class="preview-error">Render error: ' + error.message + '\\n\\n' + (error.stack || '').split('\\n').slice(0,5).join('\\n') + '</div>';
+      console.error('[BUNDLER] Boot error:', error);
+      document.getElementById('root').innerHTML = '<div class="preview-error">Boot error: ' + error.message + '</div>';
     }
   </script>
 </body>
