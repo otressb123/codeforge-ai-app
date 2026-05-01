@@ -20,7 +20,7 @@ export interface PreviewPanelRef {
 
 type DeviceType = "desktop" | "tablet" | "mobile";
 
-const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(({ html, files, onRefresh, onPreviewError }, ref) => {
+const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(({ html, files, onRefresh, onPreviewError, onManualFix }, ref) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Expose capture function to parent
