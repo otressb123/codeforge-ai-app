@@ -1,9 +1,9 @@
-import { Globe, RefreshCw, ExternalLink, Smartphone, Monitor, Tablet, Maximize2 } from "lucide-react";
-import { useState, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from "react";
+import { Globe, RefreshCw, Smartphone, Monitor, Tablet, Maximize2, AlertTriangle, X, Wand2, ShieldCheck } from "lucide-react";
+import { useState, useCallback, useEffect, useRef, useImperativeHandle, forwardRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { FileNode } from "@/components/FileExplorer";
-import { bundlePreview } from "@/lib/previewBundler";
+import { bundlePreview, runHealthCheck, HealthIssue } from "@/lib/previewBundler";
 import { capturePreviewScreenshot, PreviewCaptureResult } from "@/hooks/usePreviewCapture";
 
 interface PreviewPanelProps {
@@ -11,6 +11,7 @@ interface PreviewPanelProps {
   files?: FileNode[];
   onRefresh?: () => void;
   onPreviewError?: (error: string) => void;
+  onManualFix?: (error: string) => void;
 }
 
 export interface PreviewPanelRef {
