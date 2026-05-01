@@ -730,13 +730,18 @@ const IDE = () => {
           <ResizablePanel defaultSize={25} minSize={20}>
             <ResizablePanelGroup direction="vertical">
               <ResizablePanel defaultSize={60}>
-                <PreviewPanel 
+                <PreviewPanel
                   ref={previewRef}
                   key={previewKey}
-                  html={getPreviewHtml()} 
+                  html={getPreviewHtml()}
                   files={files}
                   onRefresh={() => setPreviewKey(prev => prev + 1)}
                   onPreviewError={handlePreviewError}
+                  onManualFix={(err) => {
+                    lastAutoFixError.current = "";
+                    autoFixCooldown.current = 0;
+                    handlePreviewError(err);
+                  }}
                 />
               </ResizablePanel>
               <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
