@@ -116,8 +116,8 @@ const IDE = () => {
   // Auto-fix handler: debounced, prevents loops
   const handlePreviewError = useCallback((error: string) => {
     const now = Date.now();
-    // Skip if same error or within 15s cooldown
-    if (error === lastAutoFixError.current || now - autoFixCooldown.current < 15000) return;
+    // Skip if same error or within 6s cooldown (fully-automatic mode)
+    if (error === lastAutoFixError.current || now - autoFixCooldown.current < 6000) return;
     lastAutoFixError.current = error;
     autoFixCooldown.current = now;
     // Try sidebar AI chat first, then bottom panel
