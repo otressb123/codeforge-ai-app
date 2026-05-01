@@ -143,6 +143,25 @@ const IDE = () => {
     onToggleTerminal: () => setActiveTab(prev => prev === "terminal" ? "files" : "terminal"),
   });
 
+  // Persist project state to localStorage (debounced)
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (persistTimer.current) clearTimeout(persistTimer.current);
+    persistTimer.current = setTimeout(() => {
+      try {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ files, openFiles, activeFile, selectedPath, projectName })
+        );
+      } catch (e) {
+        console.warn("Failed to persist project state", e);
+      }
+    }, 400);
+    return () => {
+      if (persistTimer.current) clearTimeout(persistTimer.current);
+    };
+  }, [files, openFiles, activeFile, selectedPath, projectName]);
+
   const findFileContent = useCallback((files: FileNode[], path: string): string | null => {
     for (const file of files) {
       if (file.type === "file") {
