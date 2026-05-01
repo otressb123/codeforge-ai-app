@@ -160,6 +160,9 @@ const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(({ html, fil
     </html>
   `;
 
+  const errorCount = (runtimeError ? 1 : 0) + healthErrors.length;
+  const errorLogCount = consoleLogs.filter(l => l.startsWith("[error]") || l.startsWith("[ERROR]")).length;
+
   return (
     <div className="flex flex-col h-full bg-panel">
       {/* Toolbar */}
@@ -167,59 +170,53 @@ const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(({ html, fil
         <div className="flex items-center gap-2">
           <Globe className="w-4 h-4 text-primary" />
           <span className="text-xs text-muted-foreground">Preview</span>
+          {/* Health badge */}
+          {healthErrors.length === 0 && !runtimeError ? (
+            <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400" title="Safe Build: all checks passed">
+              <ShieldCheck className="w-3 h-3" /> healthy
+            </span>
+          ) : (
+            <button
+              onClick={() => setErrorDismissed(false)}
+              className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 hover:bg-red-500/25"
+              title="Click to view errors"
+            >
+              <AlertTriangle className="w-3 h-3" /> {errorCount} issue{errorCount === 1 ? "" : "s"}
+            </button>
+          )}
         </div>
         
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-7 w-7 ${device === "mobile" ? "bg-primary/20 text-primary" : ""}`}
-            onClick={() => setDevice("mobile")}
-          >
+          <Button variant="ghost" size="icon" className={`h-7 w-7 ${device === "mobile" ? "bg-primary/20 text-primary" : ""}`} onClick={() => setDevice("mobile")}>
             <Smartphone className="w-4 h-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-7 w-7 ${device === "tablet" ? "bg-primary/20 text-primary" : ""}`}
-            onClick={() => setDevice("tablet")}
-          >
+          <Button variant="ghost" size="icon" className={`h-7 w-7 ${device === "tablet" ? "bg-primary/20 text-primary" : ""}`} onClick={() => setDevice("tablet")}>
             <Tablet className="w-4 h-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-7 w-7 ${device === "desktop" ? "bg-primary/20 text-primary" : ""}`}
-            onClick={() => setDevice("desktop")}
-          >
+          <Button variant="ghost" size="icon" className={`h-7 w-7 ${device === "desktop" ? "bg-primary/20 text-primary" : ""}`} onClick={() => setDevice("desktop")}>
             <Monitor className="w-4 h-4" />
           </Button>
         </div>
 
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={handleRefresh}
-            title="Refresh (Ctrl+R)"
+          <button
+            onClick={() => setShowConsole(s => !s)}
+            className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${showConsole ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground hover:text-foreground"}`}
+            title="Toggle console"
           >
+            console{errorLogCount > 0 ? ` (${errorLogCount})` : ""}
+          </button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleRefresh} title="Refresh (Ctrl+R)">
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-7 w-7"
-            onClick={handleOpenInBrowser}
-            title="Open in new tab"
-          >
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleOpenInBrowser} title="Open in new tab">
             <Maximize2 className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
       {/* Preview Frame */}
-      <div className="flex-1 flex items-start justify-center p-4 overflow-auto bg-muted/20">
+      <div className="flex-1 flex items-start justify-center p-4 overflow-auto bg-muted/20 relative">
         <motion.div
           className="bg-white rounded-lg overflow-hidden shadow-2xl"
           style={{ width: getDeviceWidth(), height: device === "desktop" ? "100%" : "auto" }}
@@ -235,14 +232,63 @@ const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(({ html, fil
             sandbox="allow-scripts allow-same-origin"
           />
         </motion.div>
+
+        {/* Error overlay (runtime + health) */}
+        <AnimatePresence>
+          {(runtimeError || healthErrors.length > 0) && !errorDismissed && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="absolute bottom-4 left-4 right-4 max-h-[60%] overflow-auto rounded-lg border border-red-500/40 bg-zinc-950/95 backdrop-blur shadow-2xl text-xs font-mono"
+            >
+              <div className="flex items-center justify-between px-3 py-2 border-b border-red-500/30 bg-red-500/10">
+                <div className="flex items-center gap-2 text-red-400">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span className="font-semibold">{healthErrors.length > 0 ? "Safe Build" : "Runtime Error"}</span>
+                  <span className="text-red-300/70">{errorCount} issue{errorCount === 1 ? "" : "s"}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      const payload = healthErrors.length > 0
+                        ? "[SAFE BUILD]\n" + healthErrors.map(i => (i.file ? i.file + ": " : "") + i.message + (i.hint ? " — " + i.hint : "")).join("\n")
+                        : runtimeError || "";
+                      onManualFix?.(payload);
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 rounded bg-primary/20 text-primary hover:bg-primary/30 text-[11px]"
+                    title="Send to AI to fix"
+                  >
+                    <Wand2 className="w-3 h-3" /> Fix with AI
+                  </button>
+                  <button onClick={() => setErrorDismissed(true)} className="p-1 text-muted-foreground hover:text-foreground" title="Dismiss">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-3 space-y-2">
+                {healthErrors.map((i, idx) => (
+                  <div key={idx} className="text-red-300">
+                    {i.file && <span className="text-cyan-400">{i.file}</span>}{i.file && " — "}
+                    {i.message}
+                    {i.hint && <div className="text-muted-foreground italic">💡 {i.hint}</div>}
+                  </div>
+                ))}
+                {runtimeError && (
+                  <pre className="text-red-300 whitespace-pre-wrap break-words">{runtimeError}</pre>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Console Logs */}
-      {consoleLogs.length > 0 && (
-        <div className="border-t border-border bg-secondary/30 max-h-24 overflow-y-auto">
-          <div className="p-2 text-xs font-mono">
+      {showConsole && consoleLogs.length > 0 && (
+        <div className="border-t border-border bg-secondary/30 max-h-32 overflow-y-auto">
+          <div className="p-2 text-xs font-mono space-y-0.5">
             {consoleLogs.map((log, i) => (
-              <div key={i} className="text-muted-foreground">{log}</div>
+              <div key={i} className={log.toLowerCase().includes("error") ? "text-red-400" : "text-muted-foreground"}>{log}</div>
             ))}
           </div>
         </div>
