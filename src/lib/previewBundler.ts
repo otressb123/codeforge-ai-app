@@ -266,8 +266,124 @@ const buildModuleSystem = (files: Record<string, string>): string => {
   return JSON.stringify(modules);
 };
 
+// ────────────────────────────────────────────────────────────
+// HEALTH CHECK / SAFE BUILD
+// Pre-flight checks run before bundling. Returns array of issues.
+// ────────────────────────────────────────────────────────────
+export interface HealthIssue {
+  level: "error" | "warning";
+  file?: string;
+  message: string;
+  hint?: string;
+}
+
+export const runHealthCheck = (files: FileNode[]): HealthIssue[] => {
+  const issues: HealthIssue[] = [];
+  const flat = flattenFiles(files);
+  const paths = Object.keys(flat);
+
+  const hasApp = paths.some(p => /(^|\/)App\.(tsx|jsx)$/.test(p));
+  const hasMain = paths.some(p => /(^|\/)(main|index)\.(tsx|jsx)$/.test(p));
+  const hasHtml = paths.some(p => /\.html$/.test(p));
+
+  if (!hasApp && !hasMain && !hasHtml) {
+    issues.push({
+      level: "error",
+      message: "No App.tsx, index.tsx, or index.html found.",
+      hint: "Ask the AI to create a src/App.tsx with a default export.",
+    });
+  }
+
+  // Per-file syntax-ish checks (cheap heuristics, NOT a full parser)
+  for (const [path, content] of Object.entries(flat)) {
+    if (!/\.(tsx|ts|jsx|js)$/.test(path)) continue;
+    if (path.includes("node_modules")) continue;
+
+    // Balanced braces / parens (rough)
+    let braces = 0, parens = 0, brackets = 0;
+    let inStr: string | null = null, inLineComment = false, inBlockComment = false, prev = "";
+    for (let i = 0; i < content.length; i++) {
+      const c = content[i];
+      const next = content[i + 1];
+      if (inLineComment) { if (c === "\n") inLineComment = false; prev = c; continue; }
+      if (inBlockComment) { if (c === "*" && next === "/") { inBlockComment = false; i++; } prev = c; continue; }
+      if (inStr) { if (c === "\\") { i++; continue; } if (c === inStr) inStr = null; prev = c; continue; }
+      if (c === "/" && next === "/") { inLineComment = true; i++; continue; }
+      if (c === "/" && next === "*") { inBlockComment = true; i++; continue; }
+      if (c === '"' || c === "'" || c === "`") { inStr = c; prev = c; continue; }
+      if (c === "{") braces++; else if (c === "}") braces--;
+      else if (c === "(") parens++; else if (c === ")") parens--;
+      else if (c === "[") brackets++; else if (c === "]") brackets--;
+      prev = c;
+    }
+    if (braces !== 0) issues.push({ level: "error", file: path, message: `Unbalanced { } (diff ${braces})`, hint: "Check for a missing brace." });
+    if (parens !== 0) issues.push({ level: "error", file: path, message: `Unbalanced ( ) (diff ${parens})`, hint: "Check for a missing parenthesis." });
+    if (brackets !== 0) issues.push({ level: "error", file: path, message: `Unbalanced [ ] (diff ${brackets})`, hint: "Check for a missing bracket." });
+
+    // App.tsx must have a default export
+    if (/(^|\/)App\.(tsx|jsx)$/.test(path) && !/export\s+default/.test(content)) {
+      issues.push({ level: "error", file: path, message: "App is missing a `export default`.", hint: "Add `export default App` at the bottom." });
+    }
+
+    // multiple createRoot calls (warning)
+    const createRootMatches = content.match(/createRoot\s*\(/g);
+    if (createRootMatches && createRootMatches.length > 1) {
+      issues.push({ level: "warning", file: path, message: "Multiple createRoot() calls detected.", hint: "There should only be one root." });
+    }
+  }
+
+  return issues;
+};
+
+const generateHealthErrorPreview = (issues: HealthIssue[]): string => {
+  const errs = issues.filter(i => i.level === "error");
+  const warns = issues.filter(i => i.level === "warning");
+  const itemHtml = (i: HealthIssue) => `
+    <div class="issue ${i.level}">
+      <div class="row">
+        <span class="badge ${i.level}">${i.level.toUpperCase()}</span>
+        ${i.file ? `<code class="file">${i.file}</code>` : ""}
+      </div>
+      <div class="msg">${i.message.replace(/</g, "&lt;")}</div>
+      ${i.hint ? `<div class="hint">💡 ${i.hint.replace(/</g, "&lt;")}</div>` : ""}
+    </div>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:ui-monospace,Menlo,monospace;background:#0b0f1a;color:#e2e8f0;padding:2rem;min-height:100vh}
+    h1{font-size:1.25rem;color:#f87171;margin-bottom:.25rem;display:flex;align-items:center;gap:.5rem}
+    .sub{color:#94a3b8;font-size:.85rem;margin-bottom:1.5rem}
+    .issue{background:#111827;border-left:4px solid #f87171;padding:1rem;border-radius:.5rem;margin-bottom:.75rem}
+    .issue.warning{border-left-color:#fbbf24}
+    .row{display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem}
+    .badge{font-size:.7rem;font-weight:700;padding:.15rem .4rem;border-radius:.25rem;background:#7f1d1d;color:#fecaca}
+    .badge.warning{background:#78350f;color:#fde68a}
+    .file{color:#67e8f9;font-size:.8rem}
+    .msg{color:#fca5a5;font-size:.9rem;margin-bottom:.25rem}
+    .issue.warning .msg{color:#fde68a}
+    .hint{color:#94a3b8;font-size:.8rem;font-style:italic}
+  </style></head><body>
+    <h1>🛑 Safe Build blocked the preview</h1>
+    <div class="sub">${errs.length} error${errs.length===1?"":"s"}, ${warns.length} warning${warns.length===1?"":"s"} — fix these and the preview will render.</div>
+    ${issues.map(itemHtml).join("")}
+    <script>
+      // Report to parent so auto-fix loop can pick it up
+      try {
+        const summary = ${JSON.stringify(errs.map(e => (e.file ? e.file + ": " : "") + e.message + (e.hint ? " — " + e.hint : "")).join("\n"))};
+        if (summary) parent.postMessage({ type: 'preview-error', error: '[SAFE BUILD]\\n' + summary }, '*');
+      } catch(e) {}
+    </script>
+  </body></html>`;
+};
+
 // Generate a complete HTML preview from the file tree
 export const bundlePreview = (files: FileNode[]): string => {
+  // 1. Health check first — block bundling on hard errors
+  const issues = runHealthCheck(files);
+  const hasErrors = issues.some(i => i.level === "error");
+  if (hasErrors) {
+    return generateHealthErrorPreview(issues);
+  }
+
   const flatFiles = flattenFiles(files);
   
   // Collect all CSS
