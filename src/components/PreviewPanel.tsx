@@ -86,16 +86,31 @@ const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(({ html, fil
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === "console") {
-        setConsoleLogs(prev => [...prev.slice(-49), event.data.message]);
+        const msg: string = event.data.message;
+        setConsoleLogs(prev => [...prev.slice(-49), msg]);
+        // Treat [error] console messages as runtime errors too
+        if (msg.startsWith("[error]")) {
+          setRuntimeError(msg);
+          setErrorDismissed(false);
+          onPreviewError?.(msg);
+        }
       }
       if (event.data?.type === "preview-error" && event.data.error) {
         setConsoleLogs(prev => [...prev.slice(-49), `[ERROR] ${event.data.error}`]);
+        setRuntimeError(event.data.error);
+        setErrorDismissed(false);
         onPreviewError?.(event.data.error);
       }
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [onPreviewError]);
+
+  // Clear runtime error when files change (give it a chance to fix itself)
+  useEffect(() => {
+    setRuntimeError(null);
+    setErrorDismissed(false);
+  }, [previewKey]);
 
   const defaultContent = `
     <!DOCTYPE html>
