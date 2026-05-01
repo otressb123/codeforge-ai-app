@@ -116,8 +116,8 @@ const IDE = () => {
   // Auto-fix handler: debounced, prevents loops
   const handlePreviewError = useCallback((error: string) => {
     const now = Date.now();
-    // Skip if same error or within 15s cooldown
-    if (error === lastAutoFixError.current || now - autoFixCooldown.current < 15000) return;
+    // Skip if same error or within 6s cooldown (fully-automatic mode)
+    if (error === lastAutoFixError.current || now - autoFixCooldown.current < 6000) return;
     lastAutoFixError.current = error;
     autoFixCooldown.current = now;
     // Try sidebar AI chat first, then bottom panel
@@ -730,13 +730,18 @@ const IDE = () => {
           <ResizablePanel defaultSize={25} minSize={20}>
             <ResizablePanelGroup direction="vertical">
               <ResizablePanel defaultSize={60}>
-                <PreviewPanel 
+                <PreviewPanel
                   ref={previewRef}
                   key={previewKey}
-                  html={getPreviewHtml()} 
+                  html={getPreviewHtml()}
                   files={files}
                   onRefresh={() => setPreviewKey(prev => prev + 1)}
                   onPreviewError={handlePreviewError}
+                  onManualFix={(err) => {
+                    lastAutoFixError.current = "";
+                    autoFixCooldown.current = 0;
+                    handlePreviewError(err);
+                  }}
                 />
               </ResizablePanel>
               <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
