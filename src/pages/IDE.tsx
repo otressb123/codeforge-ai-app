@@ -65,13 +65,35 @@ const initialFiles: FileNode[] = [
   { name: "README.md", type: "file", content: `# My App\n\nA modern web application built with React and TypeScript.\n\n## Getting Started\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`\n\n## Features\n\n- ⚡ Fast development with Vite\n- 🎨 Beautiful UI with Tailwind CSS\n- 📦 TypeScript for type safety\n- 🧩 Component-based architecture` },
 ];
 
+const STORAGE_KEY = "codeforge:project-state:v1";
+
+const loadPersistedState = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.files)) return null;
+    return parsed as {
+      files: FileNode[];
+      openFiles: OpenFile[];
+      activeFile: string | null;
+      selectedPath: string | null;
+      projectName: string;
+    };
+  } catch (e) {
+    console.warn("Failed to load persisted project state", e);
+    return null;
+  }
+};
+
 const IDE = () => {
+  const persisted = typeof window !== "undefined" ? loadPersistedState() : null;
   const [activeTab, setActiveTab] = useState<SidebarTab>("ai");
-  const [files, setFiles] = useState<FileNode[]>(initialFiles);
-  const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
-  const [activeFile, setActiveFile] = useState<string | null>(null);
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [projectName, setProjectName] = useState("my-awesome-app");
+  const [files, setFiles] = useState<FileNode[]>(persisted?.files ?? initialFiles);
+  const [openFiles, setOpenFiles] = useState<OpenFile[]>(persisted?.openFiles ?? []);
+  const [activeFile, setActiveFile] = useState<string | null>(persisted?.activeFile ?? null);
+  const [selectedPath, setSelectedPath] = useState<string | null>(persisted?.selectedPath ?? null);
+  const [projectName, setProjectName] = useState(persisted?.projectName ?? "my-awesome-app");
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
   const [isGitHubOpen, setIsGitHubOpen] = useState(false);
   const [isGitLabOpen, setIsGitLabOpen] = useState(false);
