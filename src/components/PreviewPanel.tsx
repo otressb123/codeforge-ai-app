@@ -34,6 +34,16 @@ const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(({ html, fil
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const [errorDismissed, setErrorDismissed] = useState(false);
+  const [showConsole, setShowConsole] = useState(false);
+
+  // Run health check synchronously on every files change
+  const healthIssues = useMemo<HealthIssue[]>(() => {
+    if (!files || files.length === 0) return [];
+    return runHealthCheck(files);
+  }, [files]);
+  const healthErrors = healthIssues.filter(i => i.level === "error");
 
   const getDeviceWidth = () => {
     switch (device) {
