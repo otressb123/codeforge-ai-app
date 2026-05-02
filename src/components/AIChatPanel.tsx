@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
-import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText, Brain, Zap } from "lucide-react";
+import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText, Brain, Zap, Cpu, Wrench, Palette, Lightbulb } from "lucide-react";
+import { loadProjectMemory, memoryToPrompt } from "@/lib/projectMemory";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -52,6 +53,14 @@ const AI_MODELS = [
   { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro", description: "Most powerful" },
   { id: "openai/gpt-5-mini", name: "GPT-5 Mini", description: "Fast & capable" },
   { id: "openai/gpt-5", name: "GPT-5", description: "Best reasoning" },
+];
+
+type BrainMode = "builder" | "planner" | "debugger" | "designer";
+const BRAINS: { id: BrainMode; name: string; icon: any; description: string }[] = [
+  { id: "builder", name: "Builder", icon: Cpu, description: "Writes the code" },
+  { id: "planner", name: "Planner", icon: Lightbulb, description: "Designs architecture" },
+  { id: "debugger", name: "Debugger", icon: Wrench, description: "Finds & fixes bugs" },
+  { id: "designer", name: "Designer", icon: Palette, description: "Polishes the UI" },
 ];
 
 // Flatten file tree to get file paths and contents for AI context
@@ -116,6 +125,7 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [selectedModel, setSelectedModel] = useState(AI_MODELS[0]);
+  const [brainMode, setBrainMode] = useState<BrainMode>("builder");
   const [previewEnabled, setPreviewEnabled] = useState(true);
   const [screenshotEnabled, setScreenshotEnabled] = useState(true);
   const [contextEnabled, setContextEnabled] = useState(true);
@@ -184,6 +194,8 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
       body: JSON.stringify({
         messages: messagesToSend,
         model: selectedModel.id,
+        mode: brainMode,
+        projectMemory: memoryToPrompt(loadProjectMemory()),
         screenshot: screenshot || undefined,
         projectFiles: getProjectContext(),
       }),
@@ -480,6 +492,29 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
           )}
         </div>
         <div className="flex items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2 text-primary">
+                {(() => { const B = BRAINS.find(b => b.id === brainMode)!; const Icon = B.icon; return <><Icon className="w-3 h-3" />{B.name}</>; })()}
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 bg-popover z-50">
+              {BRAINS.map((b) => {
+                const Icon = b.icon;
+                return (
+                  <DropdownMenuItem key={b.id} onClick={() => { setBrainMode(b.id); toast.success(`Brain: ${b.name}`); }} className={brainMode === b.id ? "bg-accent" : ""}>
+                    <Icon className="w-4 h-4 mr-2 text-primary" />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{b.name}</span>
+                      <span className="text-xs text-muted-foreground">{b.description}</span>
+                    </div>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2">

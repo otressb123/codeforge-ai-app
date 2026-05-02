@@ -426,6 +426,10 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
     }
   }
   
+  // Image-gen + 3D library injection
+  const imageGenUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/image-gen`;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -436,29 +440,52 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://esm.sh/three@0.160.0",
+        "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.18.0?deps=react@18,react-dom@18,three@0.160.0",
+        "@react-three/drei": "https://esm.sh/@react-three/drei@9.122.0?deps=react@18,react-dom@18,three@0.160.0,@react-three/fiber@8.18.0"
+      }
+    }
+  </script>
   <style>
     ${allCss}
-    
-    /* Base reset */
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    
-    /* Error display */
     .preview-error {
-      padding: 2rem;
-      background: #fef2f2;
-      color: #991b1b;
-      border: 1px solid #fecaca;
-      border-radius: 0.5rem;
-      margin: 1rem;
-      font-family: monospace;
-      white-space: pre-wrap;
+      padding: 2rem; background: #fef2f2; color: #991b1b;
+      border: 1px solid #fecaca; border-radius: 0.5rem; margin: 1rem;
+      font-family: monospace; white-space: pre-wrap;
     }
   </style>
 </head>
 <body>
   <div id="root"></div>
-  
-   <script>
+
+  <!-- Pre-load 3D libs into window so __require can resolve them sync -->
+  <script type="module">
+    (async () => {
+      try {
+        const [three, fiber] = await Promise.all([
+          import('three'),
+          import('@react-three/fiber'),
+        ]);
+        window.__THREE__ = three;
+        window.__R3F__ = fiber;
+        try { window.__DREI__ = await import('@react-three/drei'); } catch(e) { window.__DREI__ = {}; }
+      } catch (e) {
+        console.warn('3D libs failed to load:', e && e.message ? e.message : e);
+      }
+      window.__libsReady = true;
+      window.dispatchEvent(new Event('codeforge:libs-ready'));
+    })();
+  </script>
+
+  <script>
+    // Image-gen + 3D config injected from parent
+    window.__IMAGE_GEN_URL__ = ${JSON.stringify(imageGenUrl)};
+    window.__SUPABASE_KEY__ = ${JSON.stringify(supabaseKey)};
+
     // Console capture + error detection for parent frame
     (function() {
       const originalLog = console.log;
@@ -576,6 +603,40 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
        }
      });
     
+     // Built-in <GenerateImage prompt="..." className="..." fallback="..." /> component
+     // Calls the image-gen edge function and renders the resulting image.
+     function GenerateImage(props) {
+       const p = props || {};
+       const [src, setSrc] = React.useState(p.fallback || '');
+       const [loading, setLoading] = React.useState(true);
+       const [error, setError] = React.useState(null);
+       React.useEffect(() => {
+         let cancelled = false;
+         setLoading(true);
+         setError(null);
+         fetch(window.__IMAGE_GEN_URL__, {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + window.__SUPABASE_KEY__ },
+           body: JSON.stringify({ prompt: p.prompt || 'a beautiful abstract image' }),
+         })
+           .then(r => r.json())
+           .then(d => { if (cancelled) return; if (d.url) setSrc(d.url); else setError(d.error || 'No image'); })
+           .catch(e => { if (!cancelled) setError(String(e)); })
+           .finally(() => { if (!cancelled) setLoading(false); });
+         return () => { cancelled = true; };
+       }, [p.prompt]);
+       if (error && !src) {
+         return React.createElement('div', { className: (p.className || '') + ' bg-gray-800 text-red-400 text-xs p-2 flex items-center justify-center' }, '🖼️ ' + error);
+       }
+       if (!src) {
+         return React.createElement('div', {
+           className: (p.className || '') + ' bg-gradient-to-br from-purple-900/40 to-cyan-900/40 animate-pulse flex items-center justify-center text-white/60 text-xs',
+         }, '✨ Generating…');
+       }
+       return React.createElement('img', { src: src, className: p.className || '', alt: p.prompt || '', style: p.style });
+     }
+     window.GenerateImage = GenerateImage;
+
     function __require(path) {
        // Handle external modules
        if (path === 'react' || path === 'React') return { default: React, ...React };
@@ -590,6 +651,10 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
            AnimatePresence: ({ children }) => React.createElement(React.Fragment, null, children),
          };
        }
+       // 3D libs (preloaded into window via importmap module above)
+       if (path === 'three') return window.__THREE__ || __createExternalStub('three');
+       if (path === '@react-three/fiber') return window.__R3F__ || __createExternalStub('@react-three/fiber');
+       if (path === '@react-three/drei') return window.__DREI__ || __createExternalStub('@react-three/drei');
        // Generic external fallback
        if (typeof path === 'string' && !path.startsWith('/')) {
          return __createExternalStub(path);
@@ -626,8 +691,8 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
       
       const __exports = {};
       try {
-        const fn = new Function('__exports', '__require', 'React', 'ReactDOM', moduleCode);
-        fn(__exports, __require, React, ReactDOM);
+        const fn = new Function('__exports', '__require', 'React', 'ReactDOM', 'GenerateImage', moduleCode);
+        fn(__exports, __require, React, ReactDOM, GenerateImage);
       } catch (error) {
         console.error('Module execution error in ' + foundPath + ':', error);
         __exports.default = () => React.createElement('div', { className: 'preview-error' }, 
@@ -639,6 +704,7 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
       return __exports;
     }
     
+    function __boot() {
     // Boot the app
     try {
       console.log('[BUNDLER] Modules:', Object.keys(__modules).join(', '));
@@ -692,6 +758,16 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
     } catch (error) {
       console.error('[BUNDLER] Boot error:', error);
       document.getElementById('root').innerHTML = '<div class="preview-error">Boot error: ' + error.message + '</div>';
+    }
+    } // end __boot
+
+    // Wait for 3D libs (max 3s) then boot
+    if (window.__libsReady) {
+      __boot();
+    } else {
+      var __booted = false;
+      window.addEventListener('codeforge:libs-ready', function() { if (!__booted) { __booted = true; __boot(); } });
+      setTimeout(function() { if (!__booted) { __booted = true; __boot(); } }, 3000);
     }
   </script>
 </body>
