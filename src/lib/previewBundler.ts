@@ -426,6 +426,10 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
     }
   }
   
+  // Image-gen + 3D library injection
+  const imageGenUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/image-gen`;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -436,22 +440,22 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://esm.sh/three@0.160.0",
+        "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.18.0?deps=react@18,react-dom@18,three@0.160.0",
+        "@react-three/drei": "https://esm.sh/@react-three/drei@9.122.0?deps=react@18,react-dom@18,three@0.160.0,@react-three/fiber@8.18.0"
+      }
+    }
+  </script>
   <style>
     ${allCss}
-    
-    /* Base reset */
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    
-    /* Error display */
     .preview-error {
-      padding: 2rem;
-      background: #fef2f2;
-      color: #991b1b;
-      border: 1px solid #fecaca;
-      border-radius: 0.5rem;
-      margin: 1rem;
-      font-family: monospace;
-      white-space: pre-wrap;
+      padding: 2rem; background: #fef2f2; color: #991b1b;
+      border: 1px solid #fecaca; border-radius: 0.5rem; margin: 1rem;
+      font-family: monospace; white-space: pre-wrap;
     }
   </style>
 </head>
