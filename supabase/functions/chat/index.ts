@@ -106,20 +106,7 @@ Every code block MUST use this format:
 // complete file content
 \`\`\`
 
-## 🚨 CRITICAL BUNDLER RULES — MUST FOLLOW (white screen if you don't)
-The IDE uses an in-browser bundler (NOT Vite/Webpack):
-
-1. **NO separate type/interface files** — never create \`types.ts\` etc. Inline types in component files.
-2. **NO TS generics in JSX** — write \`React.useState(initial)\` not \`React.useState<T>(initial)\`.
-3. **Always use React. prefix for hooks** — \`React.useState\`, \`React.useEffect\`, \`React.useRef\`, \`React.useCallback\`, \`React.useMemo\`.
-4. **Keep it simple** — prefer FEWER, LARGER files. Ideal: App.tsx + 1–4 component files + styles.css.
-5. **Canvas games** — ALL game logic in ONE file. \`React.useRef\` for canvas, \`React.useEffect\` for game loop.
-6. **Available libraries — ONLY**: react, react-dom, lucide-react, framer-motion. DO NOT import anything else (no axios, no react-icons, no react-router, no zustand). If you need routing, use a single \`page\` state. If you need icons, use lucide-react. If you need fetch, use the global \`fetch\`.
-7. **CSS** — Tailwind classes in JSX. Custom CSS only in styles.css.
-8. **Default exports** — every component file MUST have \`export default ComponentName\`.
-9. **App.tsx is the entry** — always create App.tsx with a default export. It MUST render visible content.
-10. **No empty files** — every file must contain executable code.
-11. **Balanced braces** — count your { } ( ) [ ] before finishing each file. The Safe Build will block previews with unbalanced braces.
+${BUNDLER_RULES}
 
 ## BUILDING RULES
 1. Generate COMPLETE files — never snippets, never "// rest of code here".
@@ -142,10 +129,11 @@ The IDE uses an in-browser bundler (NOT Vite/Webpack):
 - React.useState for component state, React.useContext for shared state.
 - Conditional rendering with a "page" state for multi-page feel.
 - REALISTIC mock data (real names, descriptions, prices, images from picsum.photos).
+- For AI-generated images use \`<GenerateImage prompt="..." className="..." />\` (built-in helper).
+- For 3D scenes use react-three-fiber: \`<Canvas><mesh>...</mesh></Canvas>\`.
 - Every button DOES something.
 - Loading/empty/hover states everywhere.
 - **Games**: ALL logic in ONE file. requestAnimationFrame loop.
-- **Spotify-like**: sidebar playlists, album grid, bottom player bar with controls + progress, mock songs.
 
 ## RESPONSE STRUCTURE
 1. (For new builds) The 🧠 PLAN block (≤8 lines).
@@ -153,6 +141,13 @@ The IDE uses an in-browser bundler (NOT Vite/Webpack):
 3. Brief summary (2–3 lines max).
 
 NEVER ask clarifying questions when you can make a creative decision. BUILD FIRST, iterate later.`;
+
+const PROMPTS: Record<string, string> = {
+  planner: PLANNER_PROMPT,
+  builder: BUILDER_PROMPT,
+  debugger: DEBUGGER_PROMPT,
+  designer: DESIGNER_PROMPT,
+};
 
 
 serve(async (req) => {
