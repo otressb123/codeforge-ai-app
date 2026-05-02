@@ -691,8 +691,8 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
       
       const __exports = {};
       try {
-        const fn = new Function('__exports', '__require', 'React', 'ReactDOM', moduleCode);
-        fn(__exports, __require, React, ReactDOM);
+        const fn = new Function('__exports', '__require', 'React', 'ReactDOM', 'GenerateImage', moduleCode);
+        fn(__exports, __require, React, ReactDOM, GenerateImage);
       } catch (error) {
         console.error('Module execution error in ' + foundPath + ':', error);
         __exports.default = () => React.createElement('div', { className: 'preview-error' }, 
