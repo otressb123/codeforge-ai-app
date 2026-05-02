@@ -603,6 +603,40 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
        }
      });
     
+     // Built-in <GenerateImage prompt="..." className="..." fallback="..." /> component
+     // Calls the image-gen edge function and renders the resulting image.
+     function GenerateImage(props) {
+       const p = props || {};
+       const [src, setSrc] = React.useState(p.fallback || '');
+       const [loading, setLoading] = React.useState(true);
+       const [error, setError] = React.useState(null);
+       React.useEffect(() => {
+         let cancelled = false;
+         setLoading(true);
+         setError(null);
+         fetch(window.__IMAGE_GEN_URL__, {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + window.__SUPABASE_KEY__ },
+           body: JSON.stringify({ prompt: p.prompt || 'a beautiful abstract image' }),
+         })
+           .then(r => r.json())
+           .then(d => { if (cancelled) return; if (d.url) setSrc(d.url); else setError(d.error || 'No image'); })
+           .catch(e => { if (!cancelled) setError(String(e)); })
+           .finally(() => { if (!cancelled) setLoading(false); });
+         return () => { cancelled = true; };
+       }, [p.prompt]);
+       if (error && !src) {
+         return React.createElement('div', { className: (p.className || '') + ' bg-gray-800 text-red-400 text-xs p-2 flex items-center justify-center' }, '🖼️ ' + error);
+       }
+       if (!src) {
+         return React.createElement('div', {
+           className: (p.className || '') + ' bg-gradient-to-br from-purple-900/40 to-cyan-900/40 animate-pulse flex items-center justify-center text-white/60 text-xs',
+         }, '✨ Generating…');
+       }
+       return React.createElement('img', { src: src, className: p.className || '', alt: p.prompt || '', style: p.style });
+     }
+     window.GenerateImage = GenerateImage;
+
     function __require(path) {
        // Handle external modules
        if (path === 'react' || path === 'React') return { default: React, ...React };
@@ -617,6 +651,10 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
            AnimatePresence: ({ children }) => React.createElement(React.Fragment, null, children),
          };
        }
+       // 3D libs (preloaded into window via importmap module above)
+       if (path === 'three') return window.__THREE__ || __createExternalStub('three');
+       if (path === '@react-three/fiber') return window.__R3F__ || __createExternalStub('@react-three/fiber');
+       if (path === '@react-three/drei') return window.__DREI__ || __createExternalStub('@react-three/drei');
        // Generic external fallback
        if (typeof path === 'string' && !path.startsWith('/')) {
          return __createExternalStub(path);
