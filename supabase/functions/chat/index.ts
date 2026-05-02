@@ -156,7 +156,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, model, screenshot, projectFiles } = await req.json();
+    const { messages, model, screenshot, projectFiles, mode, projectMemory } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -165,11 +165,16 @@ serve(async (req) => {
     }
 
     const selectedModel = model || "google/gemini-3-flash-preview";
-    console.log("AI request:", messages.length, "messages, model:", selectedModel, screenshot ? "(screenshot)" : "", projectFiles ? `(${projectFiles.length} project files)` : "");
+    const selectedMode = (typeof mode === "string" && PROMPTS[mode]) ? mode : "builder";
+    console.log("AI request:", messages.length, "messages, model:", selectedModel, "mode:", selectedMode, screenshot ? "(screenshot)" : "", projectFiles ? `(${projectFiles.length} project files)` : "");
 
-    // Build system message with project context
-    let systemContent = SYSTEM_PROMPT;
-    
+    // Build system message: brain prompt + project memory + project files
+    let systemContent = PROMPTS[selectedMode];
+
+    if (projectMemory && typeof projectMemory === "string" && projectMemory.trim()) {
+      systemContent += `\n\n${projectMemory.trim()}`;
+    }
+
     if (projectFiles && projectFiles.length > 0) {
       systemContent += "\n\n## CURRENT PROJECT FILES\nThese files already exist in the user's project. Reference them when making changes:\n";
       for (const file of projectFiles) {
