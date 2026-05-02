@@ -494,6 +494,29 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
         <div className="flex items-center gap-1">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2 text-primary">
+                {(() => { const B = BRAINS.find(b => b.id === brainMode)!; const Icon = B.icon; return <><Icon className="w-3 h-3" />{B.name}</>; })()}
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 bg-popover z-50">
+              {BRAINS.map((b) => {
+                const Icon = b.icon;
+                return (
+                  <DropdownMenuItem key={b.id} onClick={() => { setBrainMode(b.id); toast.success(`Brain: ${b.name}`); }} className={brainMode === b.id ? "bg-accent" : ""}>
+                    <Icon className="w-4 h-4 mr-2 text-primary" />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{b.name}</span>
+                      <span className="text-xs text-muted-foreground">{b.description}</span>
+                    </div>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2">
                 {selectedModel.name}
                 <ChevronDown className="w-3 h-3" />
