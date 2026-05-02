@@ -704,6 +704,7 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
       return __exports;
     }
     
+    function __boot() {
     // Boot the app
     try {
       console.log('[BUNDLER] Modules:', Object.keys(__modules).join(', '));
