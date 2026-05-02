@@ -55,6 +55,14 @@ const AI_MODELS = [
   { id: "openai/gpt-5", name: "GPT-5", description: "Best reasoning" },
 ];
 
+type BrainMode = "builder" | "planner" | "debugger" | "designer";
+const BRAINS: { id: BrainMode; name: string; icon: any; description: string }[] = [
+  { id: "builder", name: "Builder", icon: Cpu, description: "Writes the code" },
+  { id: "planner", name: "Planner", icon: Lightbulb, description: "Designs architecture" },
+  { id: "debugger", name: "Debugger", icon: Wrench, description: "Finds & fixes bugs" },
+  { id: "designer", name: "Designer", icon: Palette, description: "Polishes the UI" },
+];
+
 // Flatten file tree to get file paths and contents for AI context
 const flattenFileTree = (nodes: FileNode[], basePath = ""): ProjectFile[] => {
   const result: ProjectFile[] = [];
