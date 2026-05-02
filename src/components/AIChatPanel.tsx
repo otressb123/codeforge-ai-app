@@ -125,6 +125,7 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [selectedModel, setSelectedModel] = useState(AI_MODELS[0]);
+  const [brainMode, setBrainMode] = useState<BrainMode>("builder");
   const [previewEnabled, setPreviewEnabled] = useState(true);
   const [screenshotEnabled, setScreenshotEnabled] = useState(true);
   const [contextEnabled, setContextEnabled] = useState(true);
