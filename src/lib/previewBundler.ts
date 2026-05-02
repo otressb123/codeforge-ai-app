@@ -759,6 +759,16 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
       console.error('[BUNDLER] Boot error:', error);
       document.getElementById('root').innerHTML = '<div class="preview-error">Boot error: ' + error.message + '</div>';
     }
+    } // end __boot
+
+    // Wait for 3D libs (max 3s) then boot
+    if (window.__libsReady) {
+      __boot();
+    } else {
+      var __booted = false;
+      window.addEventListener('codeforge:libs-ready', function() { if (!__booted) { __booted = true; __boot(); } });
+      setTimeout(function() { if (!__booted) { __booted = true; __boot(); } }, 3000);
+    }
   </script>
 </body>
 </html>`;
