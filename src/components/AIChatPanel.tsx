@@ -194,6 +194,8 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
       body: JSON.stringify({
         messages: messagesToSend,
         model: selectedModel.id,
+        mode: brainMode,
+        projectMemory: memoryToPrompt(loadProjectMemory()),
         screenshot: screenshot || undefined,
         projectFiles: getProjectContext(),
       }),
