@@ -481,6 +481,11 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
     })();
   </script>
 
+  <script>
+    // Image-gen + 3D config injected from parent
+    window.__IMAGE_GEN_URL__ = ${JSON.stringify(imageGenUrl)};
+    window.__SUPABASE_KEY__ = ${JSON.stringify(supabaseKey)};
+
     // Console capture + error detection for parent frame
     (function() {
       const originalLog = console.log;
