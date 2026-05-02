@@ -461,8 +461,26 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
 </head>
 <body>
   <div id="root"></div>
-  
-   <script>
+
+  <!-- Pre-load 3D libs into window so __require can resolve them sync -->
+  <script type="module">
+    (async () => {
+      try {
+        const [three, fiber] = await Promise.all([
+          import('three'),
+          import('@react-three/fiber'),
+        ]);
+        window.__THREE__ = three;
+        window.__R3F__ = fiber;
+        try { window.__DREI__ = await import('@react-three/drei'); } catch(e) { window.__DREI__ = {}; }
+      } catch (e) {
+        console.warn('3D libs failed to load:', e && e.message ? e.message : e);
+      }
+      window.__libsReady = true;
+      window.dispatchEvent(new Event('codeforge:libs-ready'));
+    })();
+  </script>
+
     // Console capture + error detection for parent frame
     (function() {
       const originalLog = console.log;
