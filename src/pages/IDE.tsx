@@ -17,7 +17,10 @@ import PageManager from "@/components/PageManager";
 import AssetManager from "@/components/AssetManager";
 import ProductionExport from "@/components/ProductionExport";
 import BreadcrumbBar from "@/components/BreadcrumbBar";
+import HistoryPanel from "@/components/HistoryPanel";
+import ProjectMemoryPanel from "@/components/ProjectMemoryPanel";
 import NewProjectDialog from "@/components/NewProjectDialog";
+import { pushSnapshot } from "@/lib/projectHistory";
 import GitHubDialog from "@/components/GitHubDialog";
 import GitLabDialog from "@/components/GitLabDialog";
 import ExportImportDialog from "@/components/ExportImportDialog";
@@ -27,7 +30,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
-type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings";
+type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory";
 
 interface OpenFile {
   path: string;
@@ -251,6 +254,8 @@ const IDE = () => {
 
   // Handle bulk file generation from AI (Cursor-style) - auto-save and update preview
   const handleFilesGenerated = useCallback((generatedFiles: { path: string; content: string; language: string }[]) => {
+    // Snapshot BEFORE the change so users can roll back
+    try { pushSnapshot(`AI applied ${generatedFiles.length} file${generatedFiles.length > 1 ? "s" : ""}`, files); } catch {}
     generatedFiles.forEach(({ path, content }) => {
       // Parse the path to create necessary folders
       const pathParts = path.split('/').filter(Boolean);
@@ -318,7 +323,7 @@ const IDE = () => {
     
     // Auto-refresh the preview after files are generated
     setPreviewKey(prev => prev + 1);
-  }, []);
+  }, [files]);
 
   const handleSave = useCallback(() => {
     setOpenFiles((prev) => prev.map((f) => ({ ...f, isModified: false })));
@@ -581,6 +586,10 @@ const IDE = () => {
         return <ExtensionsPanel />;
       case "terminal":
         return <TerminalPanel />;
+      case "history":
+        return <HistoryPanel onRestore={(restored) => { pushSnapshot("Pre-restore", files); setFiles(restored); setPreviewKey(p => p + 1); }} />;
+      case "memory":
+        return <ProjectMemoryPanel />;
       case "settings":
         return (
           <SettingsPanel

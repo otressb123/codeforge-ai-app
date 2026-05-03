@@ -1,7 +1,7 @@
-import { Files, Bot, Terminal, Settings, Search, Puzzle, GitBranch, Layers, FileText, Image } from "lucide-react";
+import { Files, Bot, Terminal, Settings, Search, Puzzle, GitBranch, Layers, FileText, Image, History, Brain } from "lucide-react";
 import { motion } from "framer-motion";
 
-type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings";
+type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory";
 
 interface ActivityBarProps {
   activeTab: SidebarTab;
@@ -13,6 +13,8 @@ const ActivityBar = ({ activeTab, onTabChange }: ActivityBarProps) => {
     { id: "files" as SidebarTab, icon: Files, label: "Explorer" },
     { id: "search" as SidebarTab, icon: Search, label: "Search" },
     { id: "ai" as SidebarTab, icon: Bot, label: "AI Assistant" },
+    { id: "memory" as SidebarTab, icon: Brain, label: "Project Memory" },
+    { id: "history" as SidebarTab, icon: History, label: "Version History" },
     { id: "components" as SidebarTab, icon: Layers, label: "Components" },
     { id: "pages" as SidebarTab, icon: FileText, label: "Pages" },
     { id: "assets" as SidebarTab, icon: Image, label: "Assets" },

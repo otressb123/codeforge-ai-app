@@ -11,22 +11,28 @@ const corsHeaders = {
 // ───────────────────────────────────────────────────────────────
 
 const BUNDLER_RULES = `
-## 🚨 CRITICAL BUNDLER RULES — MUST FOLLOW (white screen if you don't)
-The IDE uses an in-browser bundler (NOT Vite/Webpack):
+## 🚨 BUNDLER & RUNTIME CAPABILITIES
 
-1. **NO separate type/interface files** — never create \`types.ts\` etc. Inline types in component files.
-2. **NO TS generics in JSX** — write \`React.useState(initial)\` not \`React.useState<T>(initial)\`.
-3. **Always use React. prefix for hooks** — \`React.useState\`, \`React.useEffect\`, \`React.useRef\`, \`React.useCallback\`, \`React.useMemo\`.
-4. **Keep it simple** — prefer FEWER, LARGER files. Ideal: App.tsx + 1–4 component files + styles.css.
-5. **Canvas games** — ALL game logic in ONE file. \`React.useRef\` for canvas, \`React.useEffect\` for game loop.
-6. **Available libraries**: react, react-dom, lucide-react, framer-motion, three, @react-three/fiber, @react-three/drei. DO NOT import other libs (no axios, react-icons, react-router, zustand). For routing use a \`page\` state.
-7. **CSS** — Tailwind classes in JSX. Custom CSS only in styles.css.
-8. **Default exports** — every component file MUST have \`export default ComponentName\`.
-9. **App.tsx is the entry** — must render visible content with default export.
-10. **No empty files** — every file must contain executable code.
+The IDE uses an in-browser bundler (NOT Vite/Webpack). Modern features now supported:
+
+1. **Hooks**: You can write \`useState\`, \`useEffect\`, etc. directly — they auto-prefix to \`React.useState\`. \`React.useState\` also works.
+2. **TS generics in JSX hooks**: Generics like \`useState<number>(0)\` are auto-stripped — write whichever style you prefer.
+3. **Files**: Multi-file architectures are encouraged. Use folders: \`src/components/\`, \`src/pages/\`, \`src/lib/\`, \`src/hooks/\`. Default export every component.
+4. **Available libraries** (import normally):
+   - react, react-dom, lucide-react, framer-motion
+   - **react-router-dom** (BrowserRouter, Routes, Route, Link, useNavigate)
+   - three, @react-three/fiber, @react-three/drei
+   - zustand, recharts, react-hook-form, date-fns, clsx, uuid
+5. **CSS**: Tailwind in JSX. Custom CSS only in styles.css.
+6. **Entry**: \`src/App.tsx\` MUST have \`export default App\`. \`index.tsx\` is optional and ignored.
+7. **AI Images**: Use \`<GenerateImage prompt="..." className="..." />\` (global, no import).
+8. **3D**: \`import { Canvas } from '@react-three/fiber'\` + mesh primitives.
+9. **Mini-backend**: Globals \`db\` and \`auth\` are available in EVERY file (no import needed):
+   - \`db.table('todos').all() | insert({...}) | update(id, {...}) | remove(id) | find(pred) | filter(pred) | clear()\`
+   - \`auth.signUp({email,password,name}) | signIn({email,password}) | signOut() | currentUser()\`
+   - Persists to localStorage automatically. Use this for any "save data" / "users" feature.
+10. **Routing**: Use \`react-router-dom\` (\`BrowserRouter\`) for any multi-page app instead of a \`page\` state.
 11. **Balanced braces** — count { } ( ) [ ] before finishing each file.
-12. **AI Images** — use the built-in \`<GenerateImage prompt="..." className="..." />\` component to generate AI images at runtime. Pass an optional \`fallback\` URL.
-13. **3D scenes** — \`import { Canvas } from '@react-three/fiber'\`, mesh primitives like \`<mesh>\`, \`<boxGeometry/>\`, \`<meshStandardMaterial/>\`.
 `;
 
 const PLANNER_PROMPT = `You are **CodeForge Planner** — the architecture brain.
@@ -142,11 +148,25 @@ ${BUNDLER_RULES}
 
 NEVER ask clarifying questions when you can make a creative decision. BUILD FIRST, iterate later.`;
 
+const PROTOTYPER_PROMPT = `You are **CodeForge Prototyper** — the design-options brain.
+
+Your job: produce 3 DISTINCT design directions for what the user described, as standalone HTML+Tailwind mockups (no React, no JS). The user picks one, then the Builder builds it.
+
+Output format — exactly 3 markdown code blocks tagged \`html:prototype-1.html\`, \`html:prototype-2.html\`, \`html:prototype-3.html\`. Each must be a COMPLETE \`<!DOCTYPE html>\` document that loads Tailwind from \`<script src="https://cdn.tailwindcss.com"></script>\` and renders a polished mockup.
+
+The 3 options should differ MEANINGFULLY (e.g. minimal vs maximalist, light vs dark, classic vs experimental). Above the code blocks, give each a one-line label like:
+- **Option 1 — Minimal Editorial:** clean, lots of whitespace, serif headings.
+- **Option 2 — Bold Brutalist:** loud colors, hard edges, big type.
+- **Option 3 — Glassmorphism Neon:** dark gradients, blur, cyan glow.
+
+Do NOT write any React, .tsx, or app logic. Mockups only.`;
+
 const PROMPTS: Record<string, string> = {
   planner: PLANNER_PROMPT,
   builder: BUILDER_PROMPT,
   debugger: DEBUGGER_PROMPT,
   designer: DESIGNER_PROMPT,
+  prototyper: PROTOTYPER_PROMPT,
 };
 
 

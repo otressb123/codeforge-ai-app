@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
-import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText, Brain, Zap, Cpu, Wrench, Palette, Lightbulb } from "lucide-react";
+import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText, Brain, Zap, Cpu, Wrench, Palette, Lightbulb, Layout } from "lucide-react";
 import { loadProjectMemory, memoryToPrompt } from "@/lib/projectMemory";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -55,10 +55,11 @@ const AI_MODELS = [
   { id: "openai/gpt-5", name: "GPT-5", description: "Best reasoning" },
 ];
 
-type BrainMode = "builder" | "planner" | "debugger" | "designer";
+type BrainMode = "builder" | "planner" | "debugger" | "designer" | "prototyper";
 const BRAINS: { id: BrainMode; name: string; icon: any; description: string }[] = [
   { id: "builder", name: "Builder", icon: Cpu, description: "Writes the code" },
   { id: "planner", name: "Planner", icon: Lightbulb, description: "Designs architecture" },
+  { id: "prototyper", name: "Prototyper", icon: Layout, description: "3 design mockups" },
   { id: "debugger", name: "Debugger", icon: Wrench, description: "Finds & fixes bugs" },
   { id: "designer", name: "Designer", icon: Palette, description: "Polishes the UI" },
 ];
