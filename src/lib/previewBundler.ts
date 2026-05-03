@@ -486,26 +486,93 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
 <body>
   <div id="root"></div>
 
-  <!-- Pre-load 3D libs into window so __require can resolve them sync -->
+  <!-- Pre-load external packages into window so __require can resolve them sync -->
   <script type="module">
     (async () => {
-      try {
-        const [three, fiber] = await Promise.all([
-          import('three'),
-          import('@react-three/fiber'),
-        ]);
-        window.__THREE__ = three;
-        window.__R3F__ = fiber;
-        try { window.__DREI__ = await import('@react-three/drei'); } catch(e) { window.__DREI__ = {}; }
-      } catch (e) {
-        console.warn('3D libs failed to load:', e && e.message ? e.message : e);
-      }
+      const safeImport = (m) => import(m).catch(e => { console.warn('[esm.sh] failed:', m, e && e.message); return {}; });
+      const [three, fiber, drei, rrd, zustand, recharts, rhf, datefns, clsx, uuid] = await Promise.all([
+        safeImport('three'),
+        safeImport('@react-three/fiber'),
+        safeImport('@react-three/drei'),
+        safeImport('react-router-dom'),
+        safeImport('zustand'),
+        safeImport('recharts'),
+        safeImport('react-hook-form'),
+        safeImport('date-fns'),
+        safeImport('clsx'),
+        safeImport('uuid'),
+      ]);
+      window.__THREE__ = three;
+      window.__R3F__ = fiber;
+      window.__DREI__ = drei;
+      window.__RRD__ = rrd;
+      window.__ZUSTAND__ = zustand;
+      window.__RECHARTS__ = recharts;
+      window.__RHF__ = rhf;
+      window.__DATEFNS__ = datefns;
+      window.__CLSX__ = clsx;
+      window.__UUID__ = uuid;
       window.__libsReady = true;
       window.dispatchEvent(new Event('codeforge:libs-ready'));
     })();
   </script>
 
   <script>
+    // ── MINI-BACKEND: localStorage-backed db + mock auth ──
+    // Available as window.db and window.auth inside the preview.
+    (function() {
+      const KEY = 'codeforge-app-db-v1';
+      const AUTH_KEY = 'codeforge-app-auth-v1';
+      const read = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { return {}; } };
+      const write = (d) => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch {} };
+      const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      function table(name) {
+        return {
+          all() { const d = read(); return d[name] || []; },
+          insert(row) {
+            const d = read(); if (!d[name]) d[name] = [];
+            const r = { id: uid(), createdAt: Date.now(), ...row };
+            d[name].push(r); write(d); return r;
+          },
+          update(id, patch) {
+            const d = read(); if (!d[name]) return null;
+            const i = d[name].findIndex(x => x.id === id);
+            if (i < 0) return null;
+            d[name][i] = { ...d[name][i], ...patch }; write(d); return d[name][i];
+          },
+          remove(id) {
+            const d = read(); if (!d[name]) return false;
+            const before = d[name].length;
+            d[name] = d[name].filter(x => x.id !== id);
+            write(d); return d[name].length !== before;
+          },
+          find(pred) { return (read()[name] || []).find(pred); },
+          filter(pred) { return (read()[name] || []).filter(pred); },
+          clear() { const d = read(); d[name] = []; write(d); },
+        };
+      }
+      window.db = { table };
+
+      const authRead = () => { try { return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch { return null; } };
+      const authWrite = (u) => { try { u ? localStorage.setItem(AUTH_KEY, JSON.stringify(u)) : localStorage.removeItem(AUTH_KEY); } catch {} };
+      window.auth = {
+        signUp({ email, password, name }) {
+          const users = window.db.table('__users');
+          if (users.find(u => u.email === email)) throw new Error('User exists');
+          const u = users.insert({ email, password, name: name || email.split('@')[0] });
+          authWrite(u); return u;
+        },
+        signIn({ email, password }) {
+          const users = window.db.table('__users');
+          const u = users.find(x => x.email === email && x.password === password);
+          if (!u) throw new Error('Invalid credentials');
+          authWrite(u); return u;
+        },
+        signOut() { authWrite(null); },
+        currentUser() { return authRead(); },
+      };
+    })();
+
     // Image-gen + 3D config injected from parent
     window.__IMAGE_GEN_URL__ = ${JSON.stringify(imageGenUrl)};
     window.__SUPABASE_KEY__ = ${JSON.stringify(supabaseKey)};
