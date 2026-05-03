@@ -254,6 +254,8 @@ const IDE = () => {
 
   // Handle bulk file generation from AI (Cursor-style) - auto-save and update preview
   const handleFilesGenerated = useCallback((generatedFiles: { path: string; content: string; language: string }[]) => {
+    // Snapshot BEFORE the change so users can roll back
+    try { pushSnapshot(`AI applied ${generatedFiles.length} file${generatedFiles.length > 1 ? "s" : ""}`, files); } catch {}
     generatedFiles.forEach(({ path, content }) => {
       // Parse the path to create necessary folders
       const pathParts = path.split('/').filter(Boolean);
