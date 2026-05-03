@@ -17,7 +17,10 @@ import PageManager from "@/components/PageManager";
 import AssetManager from "@/components/AssetManager";
 import ProductionExport from "@/components/ProductionExport";
 import BreadcrumbBar from "@/components/BreadcrumbBar";
+import HistoryPanel from "@/components/HistoryPanel";
+import ProjectMemoryPanel from "@/components/ProjectMemoryPanel";
 import NewProjectDialog from "@/components/NewProjectDialog";
+import { pushSnapshot } from "@/lib/projectHistory";
 import GitHubDialog from "@/components/GitHubDialog";
 import GitLabDialog from "@/components/GitLabDialog";
 import ExportImportDialog from "@/components/ExportImportDialog";
@@ -27,7 +30,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
-type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings";
+type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory";
 
 interface OpenFile {
   path: string;
