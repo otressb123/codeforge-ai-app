@@ -462,7 +462,14 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
       "imports": {
         "three": "https://esm.sh/three@0.160.0",
         "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.18.0?deps=react@18,react-dom@18,three@0.160.0",
-        "@react-three/drei": "https://esm.sh/@react-three/drei@9.122.0?deps=react@18,react-dom@18,three@0.160.0,@react-three/fiber@8.18.0"
+        "@react-three/drei": "https://esm.sh/@react-three/drei@9.122.0?deps=react@18,react-dom@18,three@0.160.0,@react-three/fiber@8.18.0",
+        "react-router-dom": "https://esm.sh/react-router-dom@6.26.2?deps=react@18,react-dom@18",
+        "zustand": "https://esm.sh/zustand@4.5.5?deps=react@18",
+        "recharts": "https://esm.sh/recharts@2.12.7?deps=react@18,react-dom@18",
+        "react-hook-form": "https://esm.sh/react-hook-form@7.53.0?deps=react@18",
+        "date-fns": "https://esm.sh/date-fns@3.6.0",
+        "clsx": "https://esm.sh/clsx@2.1.1",
+        "uuid": "https://esm.sh/uuid@10.0.0"
       }
     }
   </script>
