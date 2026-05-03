@@ -586,6 +586,10 @@ const IDE = () => {
         return <ExtensionsPanel />;
       case "terminal":
         return <TerminalPanel />;
+      case "history":
+        return <HistoryPanel onRestore={(restored) => { pushSnapshot("Pre-restore", files); setFiles(restored); setPreviewKey(p => p + 1); }} />;
+      case "memory":
+        return <ProjectMemoryPanel />;
       case "settings":
         return (
           <SettingsPanel
