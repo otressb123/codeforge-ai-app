@@ -675,14 +675,22 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
            AnimatePresence: ({ children }) => React.createElement(React.Fragment, null, children),
          };
        }
-       // 3D libs (preloaded into window via importmap module above)
-       if (path === 'three') return window.__THREE__ || __createExternalStub('three');
-       if (path === '@react-three/fiber') return window.__R3F__ || __createExternalStub('@react-three/fiber');
-       if (path === '@react-three/drei') return window.__DREI__ || __createExternalStub('@react-three/drei');
-       // Generic external fallback
-       if (typeof path === 'string' && !path.startsWith('/')) {
-         return __createExternalStub(path);
-       }
+        // 3D libs (preloaded into window via importmap module above)
+        if (path === 'three') return window.__THREE__ || __createExternalStub('three');
+        if (path === '@react-three/fiber') return window.__R3F__ || __createExternalStub('@react-three/fiber');
+        if (path === '@react-three/drei') return window.__DREI__ || __createExternalStub('@react-three/drei');
+        // Other esm.sh-preloaded packages
+        if (path === 'react-router-dom') return window.__RRD__ || __createExternalStub('react-router-dom');
+        if (path === 'zustand') return window.__ZUSTAND__ || __createExternalStub('zustand');
+        if (path === 'recharts') return window.__RECHARTS__ || __createExternalStub('recharts');
+        if (path === 'react-hook-form') return window.__RHF__ || __createExternalStub('react-hook-form');
+        if (path === 'date-fns') return window.__DATEFNS__ || __createExternalStub('date-fns');
+        if (path === 'clsx') return window.__CLSX__ || __createExternalStub('clsx');
+        if (path === 'uuid') return window.__UUID__ || __createExternalStub('uuid');
+        // Generic external fallback
+        if (typeof path === 'string' && !path.startsWith('/')) {
+          return __createExternalStub(path);
+        }
       
       // Normalize path
       let normalizedPath = path;
