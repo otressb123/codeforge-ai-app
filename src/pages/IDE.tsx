@@ -324,6 +324,8 @@ const IDE = () => {
     // Auto-refresh the preview after files are generated
     setPreviewKey(prev => prev + 1);
   }, [files]);
+
+  const handleSave = useCallback(() => {
     setOpenFiles((prev) => prev.map((f) => ({ ...f, isModified: false })));
     toast.success("All files saved!");
   }, []);
