@@ -105,7 +105,24 @@ const buildModuleSystem = (files: Record<string, string>): string => {
       
       // Auto-fix missing imports (e.g. lucide-react icons) before processing
       let processedCode = autoFixMissingImports(content);
-      
+
+      // ── BUNDLER QUIRK RELAXERS ──
+      // 1. Auto-prefix unprefixed React hooks so AI can write `useState(0)` directly.
+      //    Only rewrites when the identifier is NOT imported destructured from "react".
+      const importsReactHooks = /from\s+['"]react['"]/.test(processedCode) &&
+        /import\s*\{[^}]*\b(useState|useEffect|useRef|useMemo|useCallback|useContext|useReducer|useLayoutEffect)\b/.test(processedCode);
+      if (!importsReactHooks) {
+        processedCode = processedCode.replace(
+          /(?<![\w.])(useState|useEffect|useRef|useMemo|useCallback|useContext|useReducer|useLayoutEffect)\s*\(/g,
+          "React.$1("
+        );
+      }
+      // 2. Strip TS generics from JSX-looking calls like useState<number>(0) → useState(0)
+      processedCode = processedCode.replace(
+        /\b(useState|useRef|useReducer|useCallback|useMemo|useContext|createContext|forwardRef)\s*<[^>(){}]+>\s*\(/g,
+        "$1("
+      );
+
       // Remove type-only imports (TypeScript)
       processedCode = processedCode.replace(/import\s+type\s+.*?;/g, "");
       processedCode = processedCode.replace(/import\s*\{[^}]*\btype\s+[^}]*\}\s*from\s*['"][^'"]+['"];?/g, (match) => {
