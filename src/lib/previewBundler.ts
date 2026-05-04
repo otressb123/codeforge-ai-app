@@ -611,7 +611,7 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
       }
       window.onerror = function(msg, source, line, col, err) {
         var detail = String(msg);
-        if (source) detail += ' at ' + source.replace(/^.*\//, '') + ':' + line + ':' + col;
+        if (source) detail += ' at ' + source.replace(/^.*\\//, '') + ':' + line + ':' + col;
         if (err && err.stack) detail += '\\n' + err.stack.split('\\n').slice(0,5).join('\\n');
         reportError(detail);
       };
