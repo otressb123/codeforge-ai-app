@@ -860,14 +860,25 @@ const generateReactPreview = (files: Record<string, string>, globalCss: string):
     }
     } // end __boot
 
-    // Wait for 3D libs (max 3s) then boot
-    if (window.__libsReady) {
-      __boot();
-    } else {
+    // Wait for external libs (esm.sh can be slow). Poll up to 15s, then boot anyway.
+    (function waitForLibs() {
       var __booted = false;
-      window.addEventListener('codeforge:libs-ready', function() { if (!__booted) { __booted = true; __boot(); } });
-      setTimeout(function() { if (!__booted) { __booted = true; __boot(); } }, 3000);
-    }
+      function go(reason) {
+        if (__booted) return;
+        __booted = true;
+        console.log('[BUNDLER] Booting (' + reason + '). Libs loaded:',
+          { rrd: !!window.__RRD__, zustand: !!window.__ZUSTAND__, recharts: !!window.__RECHARTS__,
+            three: !!window.__THREE__, rhf: !!window.__RHF__ });
+        __boot();
+      }
+      if (window.__libsReady) return go('ready');
+      window.addEventListener('codeforge:libs-ready', function() { go('event'); });
+      var start = Date.now();
+      var poll = setInterval(function() {
+        if (window.__libsReady) { clearInterval(poll); go('poll'); }
+        else if (Date.now() - start > 15000) { clearInterval(poll); go('timeout-15s'); }
+      }, 100);
+    })();
   </script>
 </body>
 </html>`;
