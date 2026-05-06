@@ -325,6 +325,35 @@ const IDE = () => {
     setPreviewKey(prev => prev + 1);
   }, [files]);
 
+  // Agent mode: lets the AI apply a transformation to the file tree directly.
+  // Snapshots before the change, syncs open editor tabs, and refreshes preview.
+  const handleAgentApply = useCallback((mutator: (f: FileNode[]) => FileNode[]): FileNode[] => {
+    let nextRef: FileNode[] = files;
+    try { pushSnapshot("Agent edit", files); } catch {}
+    setFiles((prev) => {
+      const next = mutator(prev);
+      nextRef = next;
+      // Sync any open tabs whose underlying file content changed
+      const flat: Record<string, string> = {};
+      const walk = (nodes: FileNode[], base = "") => {
+        for (const n of nodes) {
+          const p = `${base}/${n.name}`;
+          if (n.type === "file") flat[p] = n.content || "";
+          if (n.children) walk(n.children, p);
+        }
+      };
+      walk(next);
+      setOpenFiles((tabs) =>
+        tabs
+          .filter((t) => flat[t.path] !== undefined) // drop tabs for deleted files
+          .map((t) => flat[t.path] !== t.content ? { ...t, content: flat[t.path], isModified: false } : t)
+      );
+      return next;
+    });
+    setPreviewKey((k) => k + 1);
+    return nextRef;
+  }, [files]);
+
   const handleSave = useCallback(() => {
     setOpenFiles((prev) => prev.map((f) => ({ ...f, isModified: false })));
     toast.success("All files saved!");
@@ -558,7 +587,7 @@ const IDE = () => {
       case "search":
         return <SearchPanel />;
       case "ai":
-        return <AIChatPanel ref={aiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} />;
+        return <AIChatPanel ref={aiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} onAgentApply={handleAgentApply} />;
       case "components":
         return <ComponentLibrary onInsertComponent={handleFilesGenerated} />;
       case "pages":
@@ -755,7 +784,7 @@ const IDE = () => {
               </ResizablePanel>
               <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
               <ResizablePanel defaultSize={40}>
-                <AIChatPanel ref={bottomAiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} />
+                <AIChatPanel ref={bottomAiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} onAgentApply={handleAgentApply} />
               </ResizablePanel>
             </ResizablePanelGroup>
           </ResizablePanel>
