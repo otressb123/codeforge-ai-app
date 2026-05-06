@@ -42,6 +42,8 @@ interface AIChatPanelProps {
   previewHtml?: string | null;
   onCaptureScreenshot?: () => Promise<{ base64: string; width: number; height: number } | null>;
   projectFiles?: FileNode[];
+  // Agent mode: lets the AI mutate the project file tree directly via tool calls
+  onAgentApply?: (mutator: (files: FileNode[]) => FileNode[]) => FileNode[];
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
