@@ -301,8 +301,121 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
     return files;
   };
 
+  // Direct streaming for agent loop — appends to last assistant message
+  const streamRaw = async (msgs: Message[]): Promise<string> => {
+    const response = await fetch(CHAT_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      body: JSON.stringify({
+        messages: msgs,
+        model: selectedModel.id,
+        mode: "agent",
+        projectMemory: memoryToPrompt(loadProjectMemory()),
+        projectFiles: getProjectContext(),
+      }),
+    });
+    if (!response.ok) {
+      if (response.status === 429) { toast.error("Rate limited."); throw new Error("rate-limit"); }
+      if (response.status === 402) { toast.error("Credits exhausted."); throw new Error("no-credits"); }
+      throw new Error("AI request failed");
+    }
+    if (!response.body) throw new Error("no body");
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "", out = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) !== -1) {
+        let line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        if (line.endsWith("\r")) line = line.slice(0, -1);
+        if (!line.startsWith("data: ")) continue;
+        const j = line.slice(6).trim();
+        if (j === "[DONE]") break;
+        try {
+          const p = JSON.parse(j);
+          const c = p.choices?.[0]?.delta?.content;
+          if (c) {
+            out += c;
+            setMessages((prev) => prev.map((m, i) => i === prev.length - 1 ? { ...m, content: out } : m));
+          }
+        } catch { buf = line + "\n" + buf; break; }
+      }
+    }
+    return out;
+  };
+
+  // ─── AGENT LOOP ─────────────────────────────────────────────────────
+  const runAgentLoop = async (userInput: string) => {
+    if (!onAgentApply) { toast.error("Agent mode unavailable here"); return; }
+    const MAX_STEPS = 8;
+    const userMsg: Message = { role: "user", content: userInput };
+    let convo: Message[] = [...messages.filter((m) => m.content), userMsg];
+    setMessages((prev) => [...prev.filter((m) => m.content), userMsg, { role: "assistant", content: "" }]);
+    setInput("");
+    setIsLoading(true);
+
+    try {
+      for (let step = 0; step < MAX_STEPS; step++) {
+        if (step > 0) {
+          setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+        }
+        const response = await streamRaw(convo);
+        convo = [...convo, { role: "assistant", content: response }];
+
+        const calls = parseToolCalls(response);
+        if (calls.length === 0) { toast.info("Agent stopped (no tool calls)"); break; }
+
+        const results: ToolResult[] = [];
+        let isDone = false;
+        let doneSummary = "";
+        let mutCount = 0;
+
+        onAgentApply((current) => {
+          let next = current;
+          for (const call of calls) {
+            const { result, nextNodes } = executeTool(call, next);
+            results.push(result);
+            if (call.name === "done") { isDone = true; doneSummary = call.summary || ""; }
+            if (nextNodes !== next) { next = nextNodes; mutCount++; }
+          }
+          return next;
+        });
+
+        const summary = results.map((r) =>
+          `\`${r.call.name}\` ${r.call.path || ""} → ${r.ok ? "✅" : "❌"} ${r.output.split("\n")[0].slice(0, 140)}`
+        ).join("\n");
+        setMessages((prev) => [...prev, { role: "assistant", content: `🔧 **Tool results (${results.length})**\n${summary}` }]);
+        if (mutCount > 0) toast.success(`Agent applied ${mutCount} change(s)`);
+
+        if (isDone) {
+          if (doneSummary) toast.success(`✅ ${doneSummary.slice(0, 80)}`);
+          break;
+        }
+
+        const feedback = results.map((r) => `### ${r.call.name} ${r.call.path || ""}\n${r.output.slice(0, 4000)}`).join("\n\n");
+        convo = [...convo, { role: "user", content: `[TOOL RESULTS]\n${feedback}` }];
+
+        if (step === MAX_STEPS - 1) toast.warning("Agent hit step cap (8)");
+      }
+    } catch (e) {
+      console.error("Agent loop error:", e);
+      toast.error(e instanceof Error ? e.message : "Agent error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
+    if (brainMode === "agent" && onAgentApply) { await runAgentLoop(input); return; }
     const userMessage: Message = { role: "user", content: input };
     const newMessages = [...messages, userMessage];
     setMessages([...newMessages, { role: "assistant", content: "" }]);
