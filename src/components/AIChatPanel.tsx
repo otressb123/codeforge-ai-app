@@ -58,8 +58,9 @@ const AI_MODELS = [
   { id: "openai/gpt-5", name: "GPT-5", description: "Best reasoning" },
 ];
 
-type BrainMode = "builder" | "planner" | "debugger" | "designer" | "prototyper";
+type BrainMode = "builder" | "planner" | "debugger" | "designer" | "prototyper" | "agent";
 const BRAINS: { id: BrainMode; name: string; icon: any; description: string }[] = [
+  { id: "agent", name: "Agent", icon: Terminal, description: "Tool-using loop (read/edit/diff)" },
   { id: "builder", name: "Builder", icon: Cpu, description: "Writes the code" },
   { id: "planner", name: "Planner", icon: Lightbulb, description: "Designs architecture" },
   { id: "prototyper", name: "Prototyper", icon: Layout, description: "3 design mockups" },
