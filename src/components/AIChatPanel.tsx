@@ -111,7 +111,7 @@ export interface AIChatPanelRef {
   triggerAutoFix: (errorMessage: string) => void;
 }
 
-const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenerated, onFilesGenerated, previewHtml, onCaptureScreenshot, projectFiles }, ref) => {
+const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenerated, onFilesGenerated, previewHtml, onCaptureScreenshot, projectFiles, onAgentApply }, ref) => {
 
   // Load messages from memory
   const loadMessages = (): Message[] => {
