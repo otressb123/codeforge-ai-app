@@ -302,7 +302,9 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
   };
 
   // Direct streaming for agent loop — appends to last assistant message
-  const streamRaw = async (msgs: Message[]): Promise<string> => {
+  // Auto-retries on 429 with exponential backoff so the agent doesn't die mid-task.
+  const streamRaw = async (msgs: Message[], retry = 0): Promise<string> => {
+    const MAX_RETRY = 4;
     const response = await fetch(CHAT_URL, {
       method: "POST",
       headers: {
@@ -318,7 +320,15 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
       }),
     });
     if (!response.ok) {
-      if (response.status === 429) { toast.error("Rate limited."); throw new Error("rate-limit"); }
+      if (response.status === 429) {
+        if (retry < MAX_RETRY) {
+          const delay = Math.pow(2, retry + 1) * 1000;
+          toast.warning(`⏳ Rate limited — retrying in ${delay/1000}s (${retry+1}/${MAX_RETRY})`);
+          await new Promise(r => setTimeout(r, delay));
+          return streamRaw(msgs, retry + 1);
+        }
+        toast.error("Rate limited."); throw new Error("rate-limit");
+      }
       if (response.status === 402) { toast.error("Credits exhausted."); throw new Error("no-credits"); }
       throw new Error("AI request failed");
     }
