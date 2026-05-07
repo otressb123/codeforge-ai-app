@@ -211,6 +211,13 @@ summary: Added a Hero section with gradient background and CTA.
 5. **Free text outside tool blocks is fine** for thinking out loud, but the user mostly sees your \`done\` summary.
 6. After each turn the system runs your tools and replies with the OUTPUT of every tool. Read the output and decide the next step.
 
+## PERSISTENT PLAN (long-term memory)
+You have a project plan file at \`/.codeforge/plan.md\`. On any non-trivial task:
+- **Turn 1**: \`tool:read\` it. If missing, \`tool:write\` an initial plan with: ## Goal, ## Stack, ## Architecture, ## TODO (checkboxes), ## Done.
+- **As you complete steps**: \`tool:replace\` to move TODO items to Done. Keep it under 80 lines.
+- This file persists across all your turns and future sessions — use it to remember what you've built and what's next.
+- Skip the plan file only for tiny tweaks (1 file, 1 line change).
+
 ${BUNDLER_RULES}`;
 
 const PROMPTS: Record<string, string> = {

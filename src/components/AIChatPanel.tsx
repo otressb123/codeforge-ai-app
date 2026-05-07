@@ -51,12 +51,27 @@ const MEMORY_KEY = "codeforge-ai-memory";
 const MAX_MEMORY_MESSAGES = 50;
 
 const AI_MODELS = [
+  { id: "auto", name: "Auto", description: "Smart routing (cheap for tweaks, Pro for builds)" },
   { id: "google/gemini-3-flash-preview", name: "Gemini 3 Flash", description: "Fast & creative" },
+  { id: "google/gemini-2.5-flash-lite", name: "Gemini Flash Lite", description: "Cheapest, fastest" },
   { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash", description: "Good multimodal" },
   { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro", description: "Most powerful" },
   { id: "openai/gpt-5-mini", name: "GPT-5 Mini", description: "Fast & capable" },
   { id: "openai/gpt-5", name: "GPT-5", description: "Best reasoning" },
 ];
+
+// Heuristic router: pick the cheapest model that can handle the task.
+const routeModel = (userInput: string, mode: string): string => {
+  const txt = userInput.toLowerCase();
+  const len = userInput.length;
+  const bigKeywords = /\b(build|create|make|design|app|site|landing|dashboard|clone|game|architect|full|complete|generate)\b/;
+  const tinyKeywords = /\b(rename|typo|color|change|fix typo|tweak|move|swap|small)\b/;
+  if (mode === "planner" || mode === "designer") return "google/gemini-2.5-pro";
+  if (len > 240 || bigKeywords.test(txt)) return "google/gemini-3-flash-preview";
+  if (len < 80 || tinyKeywords.test(txt)) return "google/gemini-2.5-flash-lite";
+  return "google/gemini-3-flash-preview";
+};
+
 
 type BrainMode = "builder" | "planner" | "debugger" | "designer" | "prototyper" | "agent";
 const BRAINS: { id: BrainMode; name: string; icon: any; description: string }[] = [
@@ -198,7 +213,7 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
       },
       body: JSON.stringify({
         messages: messagesToSend,
-        model: selectedModel.id,
+        model: selectedModel.id === "auto" ? routeModel(allMessages[allMessages.length - 1]?.content || "", brainMode) : selectedModel.id,
         mode: brainMode,
         projectMemory: memoryToPrompt(loadProjectMemory()),
         screenshot: screenshot || undefined,
@@ -313,7 +328,7 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
       },
       body: JSON.stringify({
         messages: msgs,
-        model: selectedModel.id,
+        model: selectedModel.id === "auto" ? routeModel(msgs[msgs.length - 1]?.content || "", "agent") : selectedModel.id,
         mode: "agent",
         projectMemory: memoryToPrompt(loadProjectMemory()),
         projectFiles: getProjectContext(),
@@ -522,10 +537,15 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
     }
   };
 
-  // Expose auto-fix to parent via ref
+  // Expose auto-fix to parent via ref. If agent mode is active, run the agent loop
+  // with the error as input — the agent will read files, diagnose, and patch.
   useImperativeHandle(ref, () => ({
     triggerAutoFix: (errorMessage: string) => {
-      handleAutoFix(errorMessage);
+      if (brainMode === "agent" && onAgentApply) {
+        runAgentLoop(`🚨 Preview runtime error detected:\n\`\`\`\n${errorMessage}\n\`\`\`\nRead the relevant files, find the root cause, patch it with \`tool:replace\`, then \`tool:done\`.`);
+      } else {
+        handleAutoFix(errorMessage);
+      }
     },
   }));
 
