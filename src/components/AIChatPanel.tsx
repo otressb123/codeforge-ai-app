@@ -302,7 +302,9 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
   };
 
   // Direct streaming for agent loop — appends to last assistant message
-  const streamRaw = async (msgs: Message[]): Promise<string> => {
+  // Auto-retries on 429 with exponential backoff so the agent doesn't die mid-task.
+  const streamRaw = async (msgs: Message[], retry = 0): Promise<string> => {
+    const MAX_RETRY = 4;
     const response = await fetch(CHAT_URL, {
       method: "POST",
       headers: {
@@ -318,7 +320,15 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
       }),
     });
     if (!response.ok) {
-      if (response.status === 429) { toast.error("Rate limited."); throw new Error("rate-limit"); }
+      if (response.status === 429) {
+        if (retry < MAX_RETRY) {
+          const delay = Math.pow(2, retry + 1) * 1000;
+          toast.warning(`⏳ Rate limited — retrying in ${delay/1000}s (${retry+1}/${MAX_RETRY})`);
+          await new Promise(r => setTimeout(r, delay));
+          return streamRaw(msgs, retry + 1);
+        }
+        toast.error("Rate limited."); throw new Error("rate-limit");
+      }
       if (response.status === 402) { toast.error("Credits exhausted."); throw new Error("no-credits"); }
       throw new Error("AI request failed");
     }
@@ -355,23 +365,41 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
   // ─── AGENT LOOP ─────────────────────────────────────────────────────
   const runAgentLoop = async (userInput: string) => {
     if (!onAgentApply) { toast.error("Agent mode unavailable here"); return; }
-    const MAX_STEPS = 8;
+    const MAX_STEPS = 20;          // was 8 — let it finish big tasks
+    const MAX_CONSEC_FAIL = 3;     // detect getting stuck
     const userMsg: Message = { role: "user", content: userInput };
     let convo: Message[] = [...messages.filter((m) => m.content), userMsg];
     setMessages((prev) => [...prev.filter((m) => m.content), userMsg, { role: "assistant", content: "" }]);
     setInput("");
     setIsLoading(true);
 
+    let consecFail = 0;
+    let lastErrSig = "";
+    let noToolStreak = 0;
+
     try {
       for (let step = 0; step < MAX_STEPS; step++) {
         if (step > 0) {
           setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
         }
-        const response = await streamRaw(convo);
+        let response = "";
+        try {
+          response = await streamRaw(convo);
+        } catch (e) {
+          // Network/rate error already toasted by streamRaw; stop loop cleanly.
+          break;
+        }
         convo = [...convo, { role: "assistant", content: response }];
 
         const calls = parseToolCalls(response);
-        if (calls.length === 0) { toast.info("Agent stopped (no tool calls)"); break; }
+        if (calls.length === 0) {
+          noToolStreak++;
+          if (noToolStreak >= 2) { toast.info("Agent finished (no more tool calls)"); break; }
+          // Nudge it once to keep going or finish properly.
+          convo = [...convo, { role: "user", content: "[SYSTEM] You produced no tool calls. Either continue the task with more tools, or emit ```tool:done``` if finished." }];
+          continue;
+        }
+        noToolStreak = 0;
 
         const results: ToolResult[] = [];
         let isDone = false;
@@ -400,10 +428,27 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
           break;
         }
 
-        const feedback = results.map((r) => `### ${r.call.name} ${r.call.path || ""}\n${r.output.slice(0, 4000)}`).join("\n\n");
-        convo = [...convo, { role: "user", content: `[TOOL RESULTS]\n${feedback}` }];
+        // Loop-stuck detection: if all tools failed with same error twice → break with advice
+        const fails = results.filter((r) => !r.ok);
+        const errSig = fails.map((r) => r.call.name + (r.call.path || "")).join("|");
+        if (fails.length === results.length && fails.length > 0 && errSig === lastErrSig) {
+          consecFail++;
+        } else {
+          consecFail = fails.length === results.length && fails.length > 0 ? 1 : 0;
+        }
+        lastErrSig = errSig;
 
-        if (step === MAX_STEPS - 1) toast.warning("Agent hit step cap (8)");
+        if (consecFail >= MAX_CONSEC_FAIL) {
+          toast.error("Agent stuck in error loop — stopping. Try rephrasing.");
+          setMessages((prev) => [...prev, { role: "assistant", content: "⚠️ I kept hitting the same error. Stopping so we don't burn credits. Try giving me more context or breaking the task into smaller pieces." }]);
+          break;
+        }
+
+        const feedback = results.map((r) => `### ${r.call.name} ${r.call.path || ""}\n${r.output.slice(0, 4000)}`).join("\n\n");
+        const stuckHint = consecFail >= 1 ? "\n\n[HINT] Previous attempt failed. Try a DIFFERENT approach (read the file again, use a smaller search snippet, or switch to `tool:write` if `tool:replace` keeps missing)." : "";
+        convo = [...convo, { role: "user", content: `[TOOL RESULTS]\n${feedback}${stuckHint}` }];
+
+        if (step === MAX_STEPS - 1) toast.warning(`Agent hit step cap (${MAX_STEPS})`);
       }
     } catch (e) {
       console.error("Agent loop error:", e);
