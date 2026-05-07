@@ -537,10 +537,15 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
     }
   };
 
-  // Expose auto-fix to parent via ref
+  // Expose auto-fix to parent via ref. If agent mode is active, run the agent loop
+  // with the error as input — the agent will read files, diagnose, and patch.
   useImperativeHandle(ref, () => ({
     triggerAutoFix: (errorMessage: string) => {
-      handleAutoFix(errorMessage);
+      if (brainMode === "agent" && onAgentApply) {
+        runAgentLoop(`🚨 Preview runtime error detected:\n\`\`\`\n${errorMessage}\n\`\`\`\nRead the relevant files, find the root cause, patch it with \`tool:replace\`, then \`tool:done\`.`);
+      } else {
+        handleAutoFix(errorMessage);
+      }
     },
   }));
 
