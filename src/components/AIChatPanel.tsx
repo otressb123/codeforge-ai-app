@@ -328,7 +328,7 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
       },
       body: JSON.stringify({
         messages: msgs,
-        model: selectedModel.id,
+        model: selectedModel.id === "auto" ? routeModel(msgs[msgs.length - 1]?.content || "", "agent") : selectedModel.id,
         mode: "agent",
         projectMemory: memoryToPrompt(loadProjectMemory()),
         projectFiles: getProjectContext(),
