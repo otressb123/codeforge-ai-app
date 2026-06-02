@@ -46,7 +46,9 @@ export interface ToolCall {
   search?: string;     // for replace
   replace?: string;    // for replace
   summary?: string;    // for done
+  query?: string;      // for search
   raw: string;
+
 }
 
 export interface ToolResult {
