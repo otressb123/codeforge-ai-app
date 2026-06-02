@@ -203,6 +203,21 @@ path: /src/old.tsx
 summary: Added a Hero section with gradient background and CTA.
 \`\`\`
 
+### screenshot — capture the live preview as an image and SEE the rendered UI
+Use after edits to visually verify the result. Returns a brief description of what the preview shows.
+\`\`\`tool:screenshot
+\`\`\`
+
+### preview — get a text summary of the live preview DOM (cheaper than screenshot)
+\`\`\`tool:preview
+\`\`\`
+
+### search — look up libraries, APIs, error messages, or docs on the web
+\`\`\`tool:search
+query: framer-motion stagger children example
+\`\`\`
+
+
 ## RULES
 1. **Always read a file before you replace inside it.** Don't guess content.
 2. **Prefer \`replace\` over \`write\`** for any change to an existing file. Use \`write\` only for brand-new files or full rewrites.

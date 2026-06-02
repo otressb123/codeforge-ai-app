@@ -34,7 +34,10 @@
 
 import type { FileNode } from "@/components/FileExplorer";
 
-export type ToolName = "read" | "write" | "replace" | "delete" | "list" | "done";
+export type ToolName = "read" | "write" | "replace" | "delete" | "list" | "done" | "screenshot" | "preview" | "search";
+
+export const ASYNC_TOOLS = new Set<ToolName>(["screenshot", "preview", "search"]);
+
 
 export interface ToolCall {
   name: ToolName;
@@ -43,7 +46,9 @@ export interface ToolCall {
   search?: string;     // for replace
   replace?: string;    // for replace
   summary?: string;    // for done
+  query?: string;      // for search
   raw: string;
+
 }
 
 export interface ToolResult {
@@ -63,7 +68,7 @@ export const parseToolCalls = (text: string): ToolCall[] => {
   while ((m = TOOL_RE.exec(text)) !== null) {
     const name = m[1] as ToolName;
     const body = m[2];
-    if (!["read", "write", "replace", "delete", "list", "done"].includes(name)) continue;
+    if (!["read", "write", "replace", "delete", "list", "done", "screenshot", "preview", "search"].includes(name)) continue;
 
     const call: ToolCall = { name, raw: m[0] };
     const pathMatch = body.match(/^\s*path:\s*([^\n]+)/);
@@ -82,7 +87,11 @@ export const parseToolCalls = (text: string): ToolCall[] => {
     } else if (name === "done") {
       const sm = body.match(/summary:\s*([\s\S]+)/);
       if (sm) call.summary = sm[1].trim();
+    } else if (name === "search") {
+      const q = body.match(/query:\s*([^\n]+)/);
+      if (q) (call as any).query = q[1].trim();
     }
+
     out.push(call);
   }
   return out;

@@ -20,7 +20,7 @@ import BreadcrumbBar from "@/components/BreadcrumbBar";
 import HistoryPanel from "@/components/HistoryPanel";
 import ProjectMemoryPanel from "@/components/ProjectMemoryPanel";
 import NewProjectDialog from "@/components/NewProjectDialog";
-import { pushSnapshot } from "@/lib/projectHistory";
+import { pushSnapshot, loadHistory, saveHistory } from "@/lib/projectHistory";
 import GitHubDialog from "@/components/GitHubDialog";
 import GitLabDialog from "@/components/GitLabDialog";
 import ExportImportDialog from "@/components/ExportImportDialog";
@@ -354,6 +354,18 @@ const IDE = () => {
     return nextRef;
   }, [files]);
 
+  // Pop the most recent snapshot and restore the project tree to it
+  const handleRevertLastSnapshot = useCallback((): boolean => {
+    const list = loadHistory();
+    if (list.length === 0) return false;
+    const last = list[list.length - 1];
+    saveHistory(list.slice(0, -1));
+    setFiles(last.files);
+    setPreviewKey((k) => k + 1);
+    return true;
+  }, []);
+
+
   const handleSave = useCallback(() => {
     setOpenFiles((prev) => prev.map((f) => ({ ...f, isModified: false })));
     toast.success("All files saved!");
@@ -587,7 +599,7 @@ const IDE = () => {
       case "search":
         return <SearchPanel />;
       case "ai":
-        return <AIChatPanel ref={aiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} onAgentApply={handleAgentApply} />;
+        return <AIChatPanel ref={aiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} onAgentApply={handleAgentApply} onRevertLastSnapshot={handleRevertLastSnapshot} />;
       case "components":
         return <ComponentLibrary onInsertComponent={handleFilesGenerated} />;
       case "pages":
@@ -784,7 +796,7 @@ const IDE = () => {
               </ResizablePanel>
               <ResizableHandle className="h-1 bg-border hover:bg-primary/50 transition-colors" />
               <ResizablePanel defaultSize={40}>
-                <AIChatPanel ref={bottomAiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} onAgentApply={handleAgentApply} />
+                <AIChatPanel ref={bottomAiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} onAgentApply={handleAgentApply} onRevertLastSnapshot={handleRevertLastSnapshot} />
               </ResizablePanel>
             </ResizablePanelGroup>
           </ResizablePanel>

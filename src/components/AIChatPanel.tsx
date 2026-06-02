@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText, Brain, Zap, Cpu, Wrench, Palette, Lightbulb, Layout, Terminal } from "lucide-react";
 import { loadProjectMemory, memoryToPrompt } from "@/lib/projectMemory";
-import { parseToolCalls, executeTool, type ToolResult } from "@/lib/agentTools";
+import { parseToolCalls, executeTool, ASYNC_TOOLS, type ToolResult, type ToolCall } from "@/lib/agentTools";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -44,7 +44,10 @@ interface AIChatPanelProps {
   projectFiles?: FileNode[];
   // Agent mode: lets the AI mutate the project file tree directly via tool calls
   onAgentApply?: (mutator: (files: FileNode[]) => FileNode[]) => FileNode[];
+  // Revert the most recent snapshot taken before an agent run
+  onRevertLastSnapshot?: () => boolean;
 }
+
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const MEMORY_KEY = "codeforge-ai-memory";
@@ -126,7 +129,7 @@ export interface AIChatPanelRef {
   triggerAutoFix: (errorMessage: string) => void;
 }
 
-const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenerated, onFilesGenerated, previewHtml, onCaptureScreenshot, projectFiles, onAgentApply }, ref) => {
+const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenerated, onFilesGenerated, previewHtml, onCaptureScreenshot, projectFiles, onAgentApply, onRevertLastSnapshot }, ref) => {
 
   // Load messages from memory
   const loadMessages = (): Message[] => {
@@ -421,27 +424,84 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
         let doneSummary = "";
         let mutCount = 0;
 
-        onAgentApply((current) => {
-          let next = current;
-          for (const call of calls) {
-            const { result, nextNodes } = executeTool(call, next);
+        // Snapshot current tree for sync tools (read/write/replace/delete/list)
+        let cur = onAgentApply((x) => x);
+
+        for (const call of calls) {
+          if (ASYNC_TOOLS.has(call.name)) {
+            // Handle perception/search tools inline (async, no file mutation)
+            let ok = true;
+            let output = "";
+            try {
+              if (call.name === "preview") {
+                output = getPreviewSummary() || "PREVIEW: (no preview available)";
+              } else if (call.name === "screenshot") {
+                if (!onCaptureScreenshot) { ok = false; output = "ERROR: screenshot unavailable"; }
+                else {
+                  const shot = await onCaptureScreenshot();
+                  if (!shot) { ok = false; output = "ERROR: screenshot failed"; }
+                  else output = `SCREENSHOT captured (${shot.width}x${shot.height}). ${getPreviewSummary() || ""}`;
+                }
+              } else if (call.name === "search") {
+                const q = (call as any).query as string | undefined;
+                if (!q) { ok = false; output = "ERROR: search needs `query:`"; }
+                else {
+                  const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/web-search`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+                    body: JSON.stringify({ query: q, limit: 5 }),
+                  });
+                  const data = await r.json();
+                  if (!r.ok || data.error) { ok = false; output = `ERROR: ${data.error || r.status}`; }
+                  else {
+                    const list = (data.results || []) as { title: string; url: string; snippet: string }[];
+                    output = list.length === 0
+                      ? `SEARCH "${q}": no results`
+                      : `SEARCH "${q}":\n` + list.map((x, i) => `${i+1}. ${x.title}\n   ${x.url}\n   ${x.snippet}`).join("\n");
+                  }
+                }
+              }
+            } catch (e) {
+              ok = false;
+              output = `ERROR: ${e instanceof Error ? e.message : String(e)}`;
+            }
+            results.push({ call, ok, output });
+          } else {
+            // Sync file-system tool
+            const { result, nextNodes } = executeTool(call, cur);
             results.push(result);
             if (call.name === "done") { isDone = true; doneSummary = call.summary || ""; }
-            if (nextNodes !== next) { next = nextNodes; mutCount++; }
+            if (nextNodes !== cur) { cur = nextNodes; mutCount++; }
           }
-          return next;
-        });
+        }
+
+        // Commit accumulated file-system changes in one shot
+        if (mutCount > 0) {
+          onAgentApply(() => cur);
+        }
 
         const summary = results.map((r) =>
-          `\`${r.call.name}\` ${r.call.path || ""} → ${r.ok ? "✅" : "❌"} ${r.output.split("\n")[0].slice(0, 140)}`
+          `\`${r.call.name}\` ${r.call.path || (r.call as any).query || ""} → ${r.ok ? "✅" : "❌"} ${r.output.split("\n")[0].slice(0, 140)}`
         ).join("\n");
         setMessages((prev) => [...prev, { role: "assistant", content: `🔧 **Tool results (${results.length})**\n${summary}` }]);
         if (mutCount > 0) toast.success(`Agent applied ${mutCount} change(s)`);
 
         if (isDone) {
-          if (doneSummary) toast.success(`✅ ${doneSummary.slice(0, 80)}`);
+          if (doneSummary) {
+            toast.success(`✅ ${doneSummary.slice(0, 80)}`, {
+              action: onRevertLastSnapshot ? {
+                label: "Undo",
+                onClick: () => {
+                  if (onRevertLastSnapshot()) toast.success("Reverted to pre-agent state");
+                  else toast.error("Nothing to revert");
+                },
+              } : undefined,
+              duration: 12000,
+            });
+          }
           break;
         }
+
 
         // Loop-stuck detection: if all tools failed with same error twice → break with advice
         const fails = results.filter((r) => !r.ok);
