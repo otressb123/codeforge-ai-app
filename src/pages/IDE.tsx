@@ -354,6 +354,18 @@ const IDE = () => {
     return nextRef;
   }, [files]);
 
+  // Pop the most recent snapshot and restore the project tree to it
+  const handleRevertLastSnapshot = useCallback((): boolean => {
+    const list = loadHistory();
+    if (list.length === 0) return false;
+    const last = list[list.length - 1];
+    saveHistory(list.slice(0, -1));
+    setFiles(last.files);
+    setPreviewKey((k) => k + 1);
+    return true;
+  }, []);
+
+
   const handleSave = useCallback(() => {
     setOpenFiles((prev) => prev.map((f) => ({ ...f, isModified: false })));
     toast.success("All files saved!");
