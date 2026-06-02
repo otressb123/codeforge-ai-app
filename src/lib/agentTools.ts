@@ -34,7 +34,10 @@
 
 import type { FileNode } from "@/components/FileExplorer";
 
-export type ToolName = "read" | "write" | "replace" | "delete" | "list" | "done";
+export type ToolName = "read" | "write" | "replace" | "delete" | "list" | "done" | "screenshot" | "preview" | "search";
+
+export const ASYNC_TOOLS = new Set<ToolName>(["screenshot", "preview", "search"]);
+
 
 export interface ToolCall {
   name: ToolName;
