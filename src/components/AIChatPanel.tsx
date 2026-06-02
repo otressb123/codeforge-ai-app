@@ -44,7 +44,10 @@ interface AIChatPanelProps {
   projectFiles?: FileNode[];
   // Agent mode: lets the AI mutate the project file tree directly via tool calls
   onAgentApply?: (mutator: (files: FileNode[]) => FileNode[]) => FileNode[];
+  // Revert the most recent snapshot taken before an agent run
+  onRevertLastSnapshot?: () => boolean;
 }
+
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const MEMORY_KEY = "codeforge-ai-memory";
