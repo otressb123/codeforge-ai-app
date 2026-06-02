@@ -599,7 +599,7 @@ const IDE = () => {
       case "search":
         return <SearchPanel />;
       case "ai":
-        return <AIChatPanel ref={aiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} onAgentApply={handleAgentApply} />;
+        return <AIChatPanel ref={aiChatRef} onCodeGenerated={handleAICodeGenerated} onFilesGenerated={handleFilesGenerated} previewHtml={getPreviewHtml()} onCaptureScreenshot={handleCaptureScreenshot} projectFiles={files} onAgentApply={handleAgentApply} onRevertLastSnapshot={handleRevertLastSnapshot} />;
       case "components":
         return <ComponentLibrary onInsertComponent={handleFilesGenerated} />;
       case "pages":
