@@ -85,7 +85,11 @@ export const parseToolCalls = (text: string): ToolCall[] => {
     } else if (name === "done") {
       const sm = body.match(/summary:\s*([\s\S]+)/);
       if (sm) call.summary = sm[1].trim();
+    } else if (name === "search") {
+      const q = body.match(/query:\s*([^\n]+)/);
+      if (q) (call as any).query = q[1].trim();
     }
+
     out.push(call);
   }
   return out;
