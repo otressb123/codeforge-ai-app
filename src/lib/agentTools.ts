@@ -66,7 +66,7 @@ export const parseToolCalls = (text: string): ToolCall[] => {
   while ((m = TOOL_RE.exec(text)) !== null) {
     const name = m[1] as ToolName;
     const body = m[2];
-    if (!["read", "write", "replace", "delete", "list", "done"].includes(name)) continue;
+    if (!["read", "write", "replace", "delete", "list", "done", "screenshot", "preview", "search"].includes(name)) continue;
 
     const call: ToolCall = { name, raw: m[0] };
     const pathMatch = body.match(/^\s*path:\s*([^\n]+)/);
