@@ -20,7 +20,7 @@ import BreadcrumbBar from "@/components/BreadcrumbBar";
 import HistoryPanel from "@/components/HistoryPanel";
 import ProjectMemoryPanel from "@/components/ProjectMemoryPanel";
 import NewProjectDialog from "@/components/NewProjectDialog";
-import { pushSnapshot } from "@/lib/projectHistory";
+import { pushSnapshot, loadHistory, saveHistory } from "@/lib/projectHistory";
 import GitHubDialog from "@/components/GitHubDialog";
 import GitLabDialog from "@/components/GitLabDialog";
 import ExportImportDialog from "@/components/ExportImportDialog";
