@@ -2,3 +2,7 @@ project_id = "isnrfbmqhxjbpctmhchh"
 
 [functions.chat]
 verify_jwt = false
+
+[functions.web-search]
+verify_jwt = false
+
