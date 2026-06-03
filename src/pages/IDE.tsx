@@ -681,9 +681,8 @@ const IDE = () => {
         open={isGitLabOpen}
         onOpenChange={setIsGitLabOpen}
         projectName={projectName}
-        onConnect={() => toast.success("Connected to GitLab!")}
-        onPush={(msg) => toast.success(`Pushed to GitLab: ${msg}`)}
-        onPull={() => toast.success("Pulled from GitLab!")}
+        files={files}
+        onPull={(pulled) => { setFiles(pulled); toast.success("Project updated from GitLab"); }}
       />
 
       <ExportImportDialog
