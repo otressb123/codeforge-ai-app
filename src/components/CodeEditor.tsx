@@ -57,6 +57,7 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
   const inlineWidgetRef = useRef<any>(null);
   const inlineInputRef = useRef<HTMLInputElement>(null);
   const autocompleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [copilotThinking, setCopilotThinking] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [themePickerOpen, setThemePickerOpen] = useState(false);
   const themePickerRef = useRef<HTMLDivElement>(null);
