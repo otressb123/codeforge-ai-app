@@ -24,6 +24,7 @@ import { pushSnapshot, loadHistory, saveHistory } from "@/lib/projectHistory";
 import GitHubDialog from "@/components/GitHubDialog";
 import GitLabDialog from "@/components/GitLabDialog";
 import ExportImportDialog from "@/components/ExportImportDialog";
+import CollabPanel from "@/components/CollabPanel";
 import CommandPalette from "@/components/CommandPalette";
 import StatusBar from "@/components/StatusBar";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
