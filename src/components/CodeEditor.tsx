@@ -684,8 +684,8 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   }`}
                 >
-                  <Sparkles className="w-3 h-3" />
-                  <span className="text-[10px] font-medium">Copilot</span>
+                  <Sparkles className={`w-3 h-3 ${copilotThinking ? "animate-pulse" : ""}`} />
+                  <span className="text-[10px] font-medium">{copilotThinking ? "Thinking…" : "Copilot"}</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">
