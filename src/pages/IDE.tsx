@@ -24,13 +24,14 @@ import { pushSnapshot, loadHistory, saveHistory } from "@/lib/projectHistory";
 import GitHubDialog from "@/components/GitHubDialog";
 import GitLabDialog from "@/components/GitLabDialog";
 import ExportImportDialog from "@/components/ExportImportDialog";
+import CollabPanel from "@/components/CollabPanel";
 import CommandPalette from "@/components/CommandPalette";
 import StatusBar from "@/components/StatusBar";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
-type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory";
+type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab";
 
 interface OpenFile {
   path: string;
@@ -631,6 +632,8 @@ const IDE = () => {
         return <HistoryPanel onRestore={(restored) => { pushSnapshot("Pre-restore", files); setFiles(restored); setPreviewKey(p => p + 1); }} />;
       case "memory":
         return <ProjectMemoryPanel />;
+      case "collab":
+        return <CollabPanel currentFile={activeFile ?? undefined} />;
       case "settings":
         return (
           <SettingsPanel

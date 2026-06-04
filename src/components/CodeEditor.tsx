@@ -57,6 +57,7 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
   const inlineWidgetRef = useRef<any>(null);
   const inlineInputRef = useRef<HTMLInputElement>(null);
   const autocompleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [copilotThinking, setCopilotThinking] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [themePickerOpen, setThemePickerOpen] = useState(false);
   const themePickerRef = useRef<HTMLDivElement>(null);
@@ -289,7 +290,7 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
 
                 // Don't trigger on very short context or empty lines
                 const currentLine = model.getLineContent(position.lineNumber).trim();
-                if (currentLine.length < 3 && position.lineNumber > 1) {
+                if (currentLine.length < 2 && position.lineNumber > 1) {
                   resolve({ items: [] });
                   return;
                 }
@@ -299,6 +300,7 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
                   return;
                 }
 
+                setCopilotThinking(true);
                 const response = await fetch(CHAT_URL, {
                   method: "POST",
                   headers: {
@@ -317,6 +319,7 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
                 });
 
                 if (!response.ok || !response.body) {
+                  setCopilotThinking(false);
                   resolve({ items: [] });
                   return;
                 }
@@ -353,6 +356,7 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
                   cleaned = cleaned.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
                 }
 
+                setCopilotThinking(false);
                 if (cleaned && cleaned.length > 2 && cleaned.length < 500) {
                   resolve({
                     items: [{
@@ -369,9 +373,10 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
                   resolve({ items: [] });
                 }
               } catch {
+                setCopilotThinking(false);
                 resolve({ items: [] });
               }
-            }, 1500); // 1.5s debounce
+            }, 600); // faster trigger
           });
         },
         freeInlineCompletions: () => {},
@@ -679,8 +684,8 @@ const CodeEditor = ({ content, language, onChange, onInlineEdit, projectFiles, a
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                   }`}
                 >
-                  <Sparkles className="w-3 h-3" />
-                  <span className="text-[10px] font-medium">Copilot</span>
+                  <Sparkles className={`w-3 h-3 ${copilotThinking ? "animate-pulse" : ""}`} />
+                  <span className="text-[10px] font-medium">{copilotThinking ? "Thinking…" : "Copilot"}</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">
