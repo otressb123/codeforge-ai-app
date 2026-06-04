@@ -632,6 +632,8 @@ const IDE = () => {
         return <HistoryPanel onRestore={(restored) => { pushSnapshot("Pre-restore", files); setFiles(restored); setPreviewKey(p => p + 1); }} />;
       case "memory":
         return <ProjectMemoryPanel />;
+      case "collab":
+        return <CollabPanel currentFile={activeFile ?? undefined} />;
       case "settings":
         return (
           <SettingsPanel
