@@ -861,6 +861,9 @@ const IDE = () => {
         lineCount={currentFile?.content.split("\n").length}
         isAIEnabled={autocompleteEnabled}
       />
+
+      {/* Pomodoro extension widget */}
+      <PomodoroWidget open={pomodoroOpen} onClose={() => setPomodoroOpen(false)} />
     </div>
   );
 };
