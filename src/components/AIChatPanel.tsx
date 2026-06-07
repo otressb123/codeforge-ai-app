@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
-import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText, Brain, Zap, Cpu, Wrench, Palette, Lightbulb, Layout, Terminal } from "lucide-react";
+import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText, Brain, Zap, Cpu, Wrench, Palette, Lightbulb, Layout, Terminal, KeyRound, Plus } from "lucide-react";
 import { loadProjectMemory, memoryToPrompt } from "@/lib/projectMemory";
 import { parseToolCalls, executeTool, ASYNC_TOOLS, type ToolResult, type ToolCall } from "@/lib/agentTools";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,6 +9,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -19,6 +21,8 @@ import {
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import type { FileNode } from "@/components/FileExplorer";
+import BYOKDialog from "@/components/BYOKDialog";
+import { loadBYOK, type BYOKProvider } from "@/lib/byok";
 
 interface Message {
   role: "user" | "assistant";
@@ -147,11 +151,14 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [selectedModel, setSelectedModel] = useState(AI_MODELS[0]);
+  const [selectedModel, setSelectedModel] = useState<{ id: string; name: string; description: string }>(AI_MODELS[0]);
   const [brainMode, setBrainMode] = useState<BrainMode>("builder");
   const [previewEnabled, setPreviewEnabled] = useState(true);
   const [screenshotEnabled, setScreenshotEnabled] = useState(true);
   const [contextEnabled, setContextEnabled] = useState(true);
+  const [byokOpen, setByokOpen] = useState(false);
+  const [byokList, setByokList] = useState<BYOKProvider[]>(() => loadBYOK());
+  const refreshByok = useCallback(() => setByokList(loadBYOK()), []);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Save messages to localStorage for memory persistence
