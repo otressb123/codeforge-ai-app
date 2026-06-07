@@ -245,6 +245,12 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
             messages: messagesToSend,
             model: selectedModel.id === "auto" ? routeModel(allMessages[allMessages.length - 1]?.content || "", brainMode) : selectedModel.id,
             mode: brainMode,
+            projectMemory: memoryToPrompt(loadProjectMemory()),
+            screenshot: screenshot || undefined,
+            projectFiles: getProjectContext(),
+          }),
+        });
+
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
