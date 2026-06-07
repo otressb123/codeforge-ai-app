@@ -1018,6 +1018,7 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
           </Button>
         </div>
       </div>
+      <BYOKDialog open={byokOpen} onOpenChange={setByokOpen} onChanged={refreshByok} />
     </div>
   );
 });
