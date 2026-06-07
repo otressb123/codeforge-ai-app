@@ -11,6 +11,7 @@ import SearchPanel from "@/components/SearchPanel";
 import TerminalPanel from "@/components/TerminalPanel";
 import SettingsPanel from "@/components/SettingsPanel";
 import ExtensionsPanel from "@/components/ExtensionsPanel";
+import PomodoroWidget from "@/components/PomodoroWidget";
 import GitPanel from "@/components/GitPanel";
 import ComponentLibrary from "@/components/ComponentLibrary";
 import PageManager from "@/components/PageManager";
@@ -111,6 +112,7 @@ const IDE = () => {
   const [showMinimap, setShowMinimap] = useState(true);
   const [wordWrap, setWordWrap] = useState(true);
   const [lineNumbers, setLineNumbers] = useState(true);
+  const [pomodoroOpen, setPomodoroOpen] = useState(false);
   const previewRef = useRef<PreviewPanelRef>(null);
   const aiChatRef = useRef<AIChatPanelRef>(null);
   const bottomAiChatRef = useRef<AIChatPanelRef>(null);
@@ -625,7 +627,35 @@ const IDE = () => {
       case "git":
         return <GitPanel />;
       case "extensions":
-        return <ExtensionsPanel />;
+        return (
+          <ExtensionsPanel
+            onThemeChange={setEditorTheme}
+            onRunCommand={(command, ext) => {
+              if (command === "Start Pomodoro") {
+                setPomodoroOpen(true);
+                return;
+              }
+              if (command === "Format Document") {
+                // Monaco exposes its formatter via the editor; trigger via keyboard shortcut hint
+                document.dispatchEvent(new KeyboardEvent("keydown", {
+                  key: "F", code: "KeyF", shiftKey: true, altKey: true, bubbles: true,
+                }));
+                toast.success("Formatting document…", { description: "Shift+Alt+F" });
+                return;
+              }
+              if (command === "Open Git Panel") {
+                setActiveTab("git");
+                return;
+              }
+              if (command === "Toggle Copilot") {
+                setAutocompleteEnabled((v) => !v);
+                toast.success(autocompleteEnabled ? "Copilot disabled" : "Copilot enabled");
+                return;
+              }
+              toast.info(`${ext.name}: ${command}`);
+            }}
+          />
+        );
       case "terminal":
         return <TerminalPanel />;
       case "history":
@@ -831,6 +861,9 @@ const IDE = () => {
         lineCount={currentFile?.content.split("\n").length}
         isAIEnabled={autocompleteEnabled}
       />
+
+      {/* Pomodoro extension widget */}
+      <PomodoroWidget open={pomodoroOpen} onClose={() => setPomodoroOpen(false)} />
     </div>
   );
 };
