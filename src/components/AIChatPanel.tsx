@@ -793,7 +793,8 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
                 <ChevronDown className="w-3 h-3" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 bg-popover z-50">
+            <DropdownMenuContent align="end" className="w-60 bg-popover z-50 max-h-96 overflow-y-auto">
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Lovable AI</DropdownMenuLabel>
               {AI_MODELS.map((model) => (
                 <DropdownMenuItem key={model.id} onClick={() => setSelectedModel(model)} className={selectedModel.id === model.id ? "bg-accent" : ""}>
                   <div className="flex flex-col">
@@ -802,8 +803,37 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
                   </div>
                 </DropdownMenuItem>
               ))}
+              {byokList.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                    <KeyRound className="w-3 h-3" /> Your providers
+                  </DropdownMenuLabel>
+                  {byokList.map((p) => {
+                    const id = `byok:${p.id}`;
+                    return (
+                      <DropdownMenuItem
+                        key={id}
+                        onClick={() => setSelectedModel({ id, name: p.name, description: p.model })}
+                        className={selectedModel.id === id ? "bg-accent" : ""}
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">{p.name}</span>
+                          <span className="text-xs text-muted-foreground">{p.model}</span>
+                        </div>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setByokOpen(true)} className="gap-2">
+                <Plus className="w-4 h-4 text-primary" />
+                <span className="text-sm">Add your own API key</span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
 
           <TooltipProvider>
             <Tooltip>
