@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
-import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText, Brain, Zap, Cpu, Wrench, Palette, Lightbulb, Layout, Terminal } from "lucide-react";
+import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText, Brain, Zap, Cpu, Wrench, Palette, Lightbulb, Layout, Terminal, KeyRound, Plus } from "lucide-react";
 import { loadProjectMemory, memoryToPrompt } from "@/lib/projectMemory";
 import { parseToolCalls, executeTool, ASYNC_TOOLS, type ToolResult, type ToolCall } from "@/lib/agentTools";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,6 +9,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -19,6 +21,8 @@ import {
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import type { FileNode } from "@/components/FileExplorer";
+import BYOKDialog from "@/components/BYOKDialog";
+import { loadBYOK, type BYOKProvider } from "@/lib/byok";
 
 interface Message {
   role: "user" | "assistant";
@@ -147,11 +151,14 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [selectedModel, setSelectedModel] = useState(AI_MODELS[0]);
+  const [selectedModel, setSelectedModel] = useState<{ id: string; name: string; description: string }>(AI_MODELS[0]);
   const [brainMode, setBrainMode] = useState<BrainMode>("builder");
   const [previewEnabled, setPreviewEnabled] = useState(true);
   const [screenshotEnabled, setScreenshotEnabled] = useState(true);
   const [contextEnabled, setContextEnabled] = useState(true);
+  const [byokOpen, setByokOpen] = useState(false);
+  const [byokList, setByokList] = useState<BYOKProvider[]>(() => loadBYOK());
+  const refreshByok = useCallback(() => setByokList(loadBYOK()), []);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Save messages to localStorage for memory persistence
@@ -208,21 +215,42 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
       }
     }
 
-    const response = await fetch(CHAT_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-      },
-      body: JSON.stringify({
-        messages: messagesToSend,
-        model: selectedModel.id === "auto" ? routeModel(allMessages[allMessages.length - 1]?.content || "", brainMode) : selectedModel.id,
-        mode: brainMode,
-        projectMemory: memoryToPrompt(loadProjectMemory()),
-        screenshot: screenshot || undefined,
-        projectFiles: getProjectContext(),
-      }),
-    });
+    // BYOK: stream directly from user's provider (OpenAI-compatible)
+    const byokId = selectedModel.id.startsWith("byok:") ? selectedModel.id.slice(5) : null;
+    const byokProvider = byokId ? byokList.find((p) => p.id === byokId) : null;
+
+    const response = byokProvider
+      ? await fetch(`${byokProvider.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${byokProvider.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: byokProvider.model,
+            stream: true,
+            messages: [
+              { role: "system", content: "You are CodeForge AI, an expert full-stack coding assistant living in a browser IDE. Output complete files in fenced code blocks tagged like ```tsx:src/App.tsx with full content (no snippets). Keep replies concise." },
+              ...messagesToSend,
+            ],
+          }),
+        })
+      : await fetch(CHAT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: messagesToSend,
+            model: selectedModel.id === "auto" ? routeModel(allMessages[allMessages.length - 1]?.content || "", brainMode) : selectedModel.id,
+            mode: brainMode,
+            projectMemory: memoryToPrompt(loadProjectMemory()),
+            screenshot: screenshot || undefined,
+            projectFiles: getProjectContext(),
+          }),
+        });
+
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -765,7 +793,8 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
                 <ChevronDown className="w-3 h-3" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 bg-popover z-50">
+            <DropdownMenuContent align="end" className="w-60 bg-popover z-50 max-h-96 overflow-y-auto">
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Lovable AI</DropdownMenuLabel>
               {AI_MODELS.map((model) => (
                 <DropdownMenuItem key={model.id} onClick={() => setSelectedModel(model)} className={selectedModel.id === model.id ? "bg-accent" : ""}>
                   <div className="flex flex-col">
@@ -774,8 +803,37 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
                   </div>
                 </DropdownMenuItem>
               ))}
+              {byokList.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                    <KeyRound className="w-3 h-3" /> Your providers
+                  </DropdownMenuLabel>
+                  {byokList.map((p) => {
+                    const id = `byok:${p.id}`;
+                    return (
+                      <DropdownMenuItem
+                        key={id}
+                        onClick={() => setSelectedModel({ id, name: p.name, description: p.model })}
+                        className={selectedModel.id === id ? "bg-accent" : ""}
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">{p.name}</span>
+                          <span className="text-xs text-muted-foreground">{p.model}</span>
+                        </div>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setByokOpen(true)} className="gap-2">
+                <Plus className="w-4 h-4 text-primary" />
+                <span className="text-sm">Add your own API key</span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
 
           <TooltipProvider>
             <Tooltip>
@@ -960,6 +1018,7 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
           </Button>
         </div>
       </div>
+      <BYOKDialog open={byokOpen} onOpenChange={setByokOpen} onChanged={refreshByok} />
     </div>
   );
 });
