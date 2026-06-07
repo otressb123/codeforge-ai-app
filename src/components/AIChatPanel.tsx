@@ -215,21 +215,36 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
       }
     }
 
-    const response = await fetch(CHAT_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-      },
-      body: JSON.stringify({
-        messages: messagesToSend,
-        model: selectedModel.id === "auto" ? routeModel(allMessages[allMessages.length - 1]?.content || "", brainMode) : selectedModel.id,
-        mode: brainMode,
-        projectMemory: memoryToPrompt(loadProjectMemory()),
-        screenshot: screenshot || undefined,
-        projectFiles: getProjectContext(),
-      }),
-    });
+    // BYOK: stream directly from user's provider (OpenAI-compatible)
+    const byokId = selectedModel.id.startsWith("byok:") ? selectedModel.id.slice(5) : null;
+    const byokProvider = byokId ? byokList.find((p) => p.id === byokId) : null;
+
+    const response = byokProvider
+      ? await fetch(`${byokProvider.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${byokProvider.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: byokProvider.model,
+            stream: true,
+            messages: [
+              { role: "system", content: "You are CodeForge AI, an expert full-stack coding assistant living in a browser IDE. Output complete files in fenced code blocks tagged like ```tsx:src/App.tsx with full content (no snippets). Keep replies concise." },
+              ...messagesToSend,
+            ],
+          }),
+        })
+      : await fetch(CHAT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: messagesToSend,
+            model: selectedModel.id === "auto" ? routeModel(allMessages[allMessages.length - 1]?.content || "", brainMode) : selectedModel.id,
+            mode: brainMode,
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
