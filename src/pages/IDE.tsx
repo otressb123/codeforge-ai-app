@@ -644,7 +644,7 @@ const IDE = () => {
                 return;
               }
               if (command === "Open Git Panel") {
-                setActiveSidebarTab("git");
+                setActiveTab("git");
                 return;
               }
               if (command === "Toggle Copilot") {
