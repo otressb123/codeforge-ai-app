@@ -35,35 +35,41 @@ const DEFAULT_INSTALLED = [
 ];
 
 export const EXTENSION_REGISTRY: ExtensionDef[] = [
-  // AI
-  { id: "ai-copilot", name: "CodeForge Copilot", author: "CodeForge", description: "AI-powered ghost-text completions while you type.", category: "ai", downloads: 52400, rating: 4.8, icon: "🤖", version: "2.1.0", command: "Toggle Copilot", builtIn: true },
-  { id: "ai-chat-pro", name: "AI Chat Pro", author: "CodeForge", description: "Multi-model AI chat with screenshot understanding and project context.", category: "ai", downloads: 41200, rating: 4.7, icon: "💬", version: "3.0.1", builtIn: true },
-  { id: "ai-refactor", name: "AI Refactor", author: "CodeForge", description: "Select code and get instant AI refactor suggestions via Cmd+K.", category: "ai", downloads: 18900, rating: 4.5, icon: "🔧", version: "1.4.0", command: "Refactor selection" },
-  { id: "ai-docs", name: "AI Doc Generator", author: "DevTools Inc", description: "Auto-generate JSDoc, README, and API documentation from your code.", category: "ai", downloads: 15600, rating: 4.3, icon: "📝", version: "1.2.0" },
-  { id: "ai-tests", name: "AI Test Writer", author: "TestLab", description: "Generate unit, integration, and e2e tests for the active file.", category: "ai", downloads: 12800, rating: 4.4, icon: "🧪", version: "1.0.3" },
-  { id: "ai-byok", name: "BYOK Providers", author: "CodeForge", description: "Bring your own API keys: OpenAI, OpenRouter, Groq, Anthropic, DeepSeek, more.", category: "ai", downloads: 9800, rating: 4.9, icon: "🔑", version: "1.0.0" },
+  // ── AI (real VS Code marketplace AI extensions) ────────────────────
+  { id: "ai-copilot", name: "GitHub Copilot", author: "GitHub", description: "Your AI pair programmer. Get inline suggestions and completions powered by OpenAI Codex.", category: "ai", downloads: 28400000, rating: 4.6, icon: "🤖", version: "1.247.0", command: "Toggle Copilot", builtIn: true },
+  { id: "ai-copilot-chat", name: "GitHub Copilot Chat", author: "GitHub", description: "AI chat features powered by Copilot. Ask questions, explain code, fix bugs, and generate tests.", category: "ai", downloads: 18900000, rating: 4.5, icon: "💬", version: "0.24.0", builtIn: true },
+  { id: "ai-codeium", name: "Codeium", author: "Codeium", description: "Free AI code completion, chat, and search. Supports 70+ languages.", category: "ai", downloads: 6800000, rating: 4.7, icon: "⚡", version: "1.40.0" },
+  { id: "ai-tabnine", name: "Tabnine AI Autocomplete", author: "Tabnine", description: "AI-powered code completions for all major languages and frameworks.", category: "ai", downloads: 11200000, rating: 4.3, icon: "🧠", version: "3.107.0" },
+  { id: "ai-continue", name: "Continue", author: "Continue", description: "Open-source AI code assistant. Bring your own model (OpenAI, Anthropic, Ollama).", category: "ai", downloads: 1400000, rating: 4.6, icon: "🔗", version: "0.9.260", command: "Refactor selection" },
+  { id: "ai-cline", name: "Cline", author: "saoudrizwan", description: "Autonomous coding agent that can edit files, run commands, and use the browser.", category: "ai", downloads: 2100000, rating: 4.8, icon: "🦾", version: "3.2.0" },
+  { id: "ai-byok", name: "BYOK Providers", author: "CodeForge", description: "Bring your own API keys: OpenAI, OpenRouter, Groq, Anthropic, DeepSeek, and more.", category: "ai", downloads: 9800, rating: 4.9, icon: "🔑", version: "1.0.0" },
 
-  // Themes — these actually flip the Monaco theme on install
-  { id: "theme-dracula", name: "Dracula Theme", author: "Dracula", description: "Iconic dark theme with vibrant purple and pink syntax.", category: "themes", downloads: 89000, rating: 4.9, icon: "🧛", version: "2.0.0", themeId: "dracula" },
-  { id: "theme-nord", name: "Nord Theme", author: "Arctic Ice", description: "Arctic, north-bluish palette. Clean and calm.", category: "themes", downloads: 45000, rating: 4.7, icon: "❄️", version: "1.5.0", themeId: "nord" },
-  { id: "theme-monokai", name: "Monokai Pro", author: "Monokai", description: "Refined syntax highlighting with rich, warm contrast.", category: "themes", downloads: 67000, rating: 4.8, icon: "🎨", version: "3.1.0", themeId: "monokai" },
-  { id: "theme-github", name: "GitHub Dark", author: "GitHub", description: "GitHub's signature dark theme for the editor.", category: "themes", downloads: 38000, rating: 4.6, icon: "🐙", version: "1.3.0", themeId: "github-dark" },
-  { id: "theme-tokyo-night", name: "Tokyo Night", author: "enkia", description: "Clean dark theme celebrating the lights of downtown Tokyo at night.", category: "themes", downloads: 71000, rating: 4.9, icon: "🌃", version: "1.0.0", themeId: "tokyo-night" },
+  // ── Themes (real VS Code themes — flip Monaco theme on install) ────
+  { id: "theme-dracula", name: "Dracula Official", author: "Dracula Theme", description: "Official Dracula Theme. A dark theme for many editors, shells, and more.", category: "themes", downloads: 7800000, rating: 4.8, icon: "🧛", version: "2.24.3", themeId: "dracula" },
+  { id: "theme-nord", name: "Nord", author: "Arctic Ice Studio", description: "An arctic, north-bluish clean and elegant Visual Studio Code theme.", category: "themes", downloads: 1200000, rating: 4.7, icon: "❄️", version: "0.19.0", themeId: "nord" },
+  { id: "theme-monokai", name: "Monokai Pro", author: "monokai", description: "Professional theme and icon set inspired by the original Monokai.", category: "themes", downloads: 3400000, rating: 4.7, icon: "🎨", version: "1.3.4", themeId: "monokai" },
+  { id: "theme-github", name: "GitHub Theme", author: "GitHub", description: "GitHub's official themes for VS Code. Light and dark.", category: "themes", downloads: 9100000, rating: 4.6, icon: "🐙", version: "6.3.4", themeId: "github-dark" },
+  { id: "theme-tokyo-night", name: "Tokyo Night", author: "enkia", description: "A clean dark theme celebrating the lights of Downtown Tokyo at night.", category: "themes", downloads: 2500000, rating: 4.9, icon: "🌃", version: "1.1.2", themeId: "tokyo-night" },
 
-  // Languages
-  { id: "lang-python", name: "Python", author: "Microsoft", description: "Python language support with IntelliSense, linting, and debugging.", category: "languages", downloads: 120000, rating: 4.9, icon: "🐍", version: "4.2.0" },
-  { id: "lang-rust", name: "Rust Analyzer", author: "Rust", description: "Rust language support with auto-completion and error checking.", category: "languages", downloads: 56000, rating: 4.8, icon: "🦀", version: "1.8.0" },
-  { id: "lang-go", name: "Go", author: "Go Team", description: "Go language support with IntelliSense, code navigation, and debugging.", category: "languages", downloads: 48000, rating: 4.7, icon: "🔵", version: "2.1.0" },
-  { id: "lang-tailwind", name: "Tailwind CSS IntelliSense", author: "Tailwind Labs", description: "Autocomplete, syntax highlighting, and linting for Tailwind CSS.", category: "languages", downloads: 95000, rating: 4.9, icon: "💨", version: "3.0.0", builtIn: true },
-  { id: "lang-prisma", name: "Prisma", author: "Prisma", description: "Prisma schema language support with autocomplete and formatting.", category: "languages", downloads: 32000, rating: 4.6, icon: "💎", version: "1.5.0" },
+  // ── Languages (real VS Code language extensions) ───────────────────
+  { id: "lang-python", name: "Python", author: "Microsoft", description: "IntelliSense (Pylance), linting, debugging, code formatting, refactoring, and more.", category: "languages", downloads: 145000000, rating: 4.2, icon: "🐍", version: "2024.20.0" },
+  { id: "lang-rust", name: "rust-analyzer", author: "The Rust Programming Language", description: "Rust language support: completion, go-to-definition, refactorings.", category: "languages", downloads: 4200000, rating: 4.6, icon: "🦀", version: "0.3.2117" },
+  { id: "lang-go", name: "Go", author: "Go Team at Google", description: "Rich Go language support: IntelliSense, code navigation, debugging.", category: "languages", downloads: 11800000, rating: 4.5, icon: "🔵", version: "0.42.1" },
+  { id: "lang-tailwind", name: "Tailwind CSS IntelliSense", author: "Tailwind Labs", description: "Intelligent Tailwind CSS tooling: autocomplete, linting, hover previews.", category: "languages", downloads: 12500000, rating: 4.9, icon: "💨", version: "0.12.18", builtIn: true },
+  { id: "lang-prisma", name: "Prisma", author: "Prisma", description: "Adds syntax highlighting, formatting, jump-to-definition for Prisma Schema files.", category: "languages", downloads: 2800000, rating: 4.7, icon: "💎", version: "6.1.0" },
+  { id: "lang-vue", name: "Vue - Official", author: "Vue", description: "Language support for Vue 3, including Volar IntelliSense.", category: "languages", downloads: 8900000, rating: 4.4, icon: "🟢", version: "2.1.10" },
 
-  // Utilities
-  { id: "util-prettier", name: "Prettier", author: "Prettier", description: "Format the current file with Shift+Alt+F. JS, TS, CSS, JSON.", category: "utilities", downloads: 110000, rating: 4.8, icon: "✨", version: "3.2.0", command: "Format Document", builtIn: true },
-  { id: "util-eslint", name: "ESLint", author: "Microsoft", description: "Find and fix lint problems in your JavaScript/TypeScript code.", category: "utilities", downloads: 105000, rating: 4.7, icon: "🔍", version: "3.0.0", builtIn: true },
-  { id: "util-todo", name: "Todo Tree", author: "Gruntfuggly", description: "Surface TODO, FIXME, NOTE comments across your project.", category: "utilities", downloads: 42000, rating: 4.6, icon: "📋", version: "2.1.0" },
-  { id: "util-gitlens", name: "GitLens", author: "GitKraken", description: "Supercharge Git. Visualize authorship and navigate history.", category: "utilities", downloads: 78000, rating: 4.8, icon: "🔮", version: "15.0.0", command: "Open Git Panel" },
-  { id: "util-markdown", name: "Markdown Preview", author: "CodeForge", description: "Live preview of Markdown files with syntax highlighting.", category: "utilities", downloads: 35000, rating: 4.5, icon: "📖", version: "1.2.0" },
-  { id: "util-pomodoro", name: "Pomodoro Timer", author: "ProdTools", description: "Floating 25/5 focus timer in the status bar.", category: "utilities", downloads: 8500, rating: 4.2, icon: "🍅", version: "1.0.0", command: "Start Pomodoro" },
+  // ── Utilities (real VS Code marketplace utilities) ─────────────────
+  { id: "util-prettier", name: "Prettier - Code formatter", author: "Prettier", description: "Code formatter using prettier. Supports JS, TS, CSS, JSON, Markdown, and more.", category: "utilities", downloads: 49000000, rating: 4.4, icon: "✨", version: "11.0.0", command: "Format Document", builtIn: true },
+  { id: "util-eslint", name: "ESLint", author: "Microsoft", description: "Integrates ESLint into VS Code. Lint JavaScript and TypeScript projects.", category: "utilities", downloads: 41000000, rating: 4.4, icon: "🔍", version: "3.0.10", builtIn: true },
+  { id: "util-todo", name: "Todo Tree", author: "Gruntfuggly", description: "Show TODO, FIXME, etc. comment tags in a tree view.", category: "utilities", downloads: 7600000, rating: 4.7, icon: "🌳", version: "0.0.226" },
+  { id: "util-gitlens", name: "GitLens — Git supercharged", author: "GitKraken", description: "Supercharge Git within VS Code. Visualize code authorship, navigate history.", category: "utilities", downloads: 36000000, rating: 4.7, icon: "🔮", version: "16.0.5", command: "Open Git Panel" },
+  { id: "util-markdown", name: "Markdown All in One", author: "Yu Zhang", description: "All you need for Markdown: keyboard shortcuts, table of contents, auto preview.", category: "utilities", downloads: 9800000, rating: 4.8, icon: "📖", version: "3.6.2" },
+  { id: "util-live-server", name: "Live Server", author: "Ritwick Dey", description: "Launch a development local Server with live reload feature for static & dynamic pages.", category: "utilities", downloads: 56000000, rating: 4.7, icon: "🚀", version: "5.7.9" },
+  { id: "util-error-lens", name: "Error Lens", author: "Alexander", description: "Improve highlighting of errors, warnings, and other language diagnostics inline.", category: "utilities", downloads: 7400000, rating: 4.9, icon: "🔦", version: "3.22.0" },
+  { id: "util-path-intellisense", name: "Path Intellisense", author: "Christian Kohler", description: "Visual Studio Code plugin that autocompletes filenames.", category: "utilities", downloads: 18000000, rating: 4.8, icon: "📂", version: "2.10.0" },
+  { id: "util-docker", name: "Docker", author: "Microsoft", description: "Makes it easy to create, manage, and debug containerized applications.", category: "utilities", downloads: 32000000, rating: 4.3, icon: "🐳", version: "1.29.4" },
+  { id: "util-pomodoro", name: "Pomodoro Timer", author: "ProdTools", description: "Floating 25/5 focus timer in the status bar.", category: "utilities", downloads: 85000, rating: 4.2, icon: "🍅", version: "1.0.0", command: "Start Pomodoro" },
 ];
 
 // Map our themeId aliases to actual MONACO_THEMES ids
