@@ -1,7 +1,7 @@
-import { Files, Bot, Terminal, Settings, Search, Puzzle, GitBranch, Layers, FileText, Image, History, Brain, Users } from "lucide-react";
+import { Files, Bot, Terminal, Settings, Search, Puzzle, GitBranch, Layers, FileText, Image, History, Brain, Users, Box } from "lucide-react";
 import { motion } from "framer-motion";
 
-type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab";
+type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "scene";
 
 interface ActivityBarProps {
   activeTab: SidebarTab;
