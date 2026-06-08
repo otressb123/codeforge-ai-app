@@ -32,7 +32,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
-type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab";
+type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "scene";
 
 interface OpenFile {
   path: string;
@@ -664,6 +664,8 @@ const IDE = () => {
         return <ProjectMemoryPanel />;
       case "collab":
         return <CollabPanel currentFile={activeFile ?? undefined} />;
+      case "scene":
+        return <Scene3DPanel />;
       case "settings":
         return (
           <SettingsPanel
