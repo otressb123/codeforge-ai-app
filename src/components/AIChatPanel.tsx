@@ -200,7 +200,7 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
     );
   }, [contextEnabled, projectFiles]);
 
-  const streamChat = async (allMessages: Message[], screenshot?: string | null, retryCount = 0): Promise<string> => {
+  const streamChat = async (allMessages: Message[], screenshot?: string | null, retryCount = 0, overrideProvider?: BYOKProvider): Promise<string> => {
     const MAX_RETRIES = 3;
     let messagesToSend = [...allMessages];
 
@@ -217,7 +217,7 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
 
     // BYOK: stream directly from user's provider (OpenAI-compatible)
     const byokId = selectedModel.id.startsWith("byok:") ? selectedModel.id.slice(5) : null;
-    const byokProvider = byokId ? byokList.find((p) => p.id === byokId) : null;
+    const byokProvider = overrideProvider || (byokId ? byokList.find((p) => p.id === byokId) : null);
 
     const response = byokProvider
       ? await fetch(`${byokProvider.baseUrl}/chat/completions`, {
@@ -268,6 +268,14 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
         throw new Error("Rate limit exceeded after retries");
       }
       if (response.status === 402) {
+        // Auto-fallback: if user has a BYOK provider configured, switch to it and retry once.
+        if (!byokProvider && byokList.length > 0 && retryCount === 0) {
+          const fallback = byokList[0];
+          setSelectedModel({ id: `byok:${fallback.id}`, name: fallback.name, description: fallback.model });
+          toast.info(`💳 Lovable credits exhausted — switched to ${fallback.name} (${fallback.model})`, { duration: 6000 });
+          // Retry with the new model selection (state updates next render, so pass override via closure)
+          return streamChat(allMessages, screenshot, retryCount + 1, fallback);
+        }
         toast.error("💳 AI credits exhausted", {
           description: byokList.length > 0
             ? "Switch to one of your BYOK providers in the model dropdown to keep working."
@@ -354,10 +362,10 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
 
   // Direct streaming for agent loop — appends to last assistant message
   // Auto-retries on 429 with exponential backoff so the agent doesn't die mid-task.
-  const streamRaw = async (msgs: Message[], retry = 0): Promise<string> => {
+  const streamRaw = async (msgs: Message[], retry = 0, overrideProvider?: BYOKProvider): Promise<string> => {
     const MAX_RETRY = 4;
     const byokId = selectedModel.id.startsWith("byok:") ? selectedModel.id.slice(5) : null;
-    const byokProvider = byokId ? byokList.find((p) => p.id === byokId) : null;
+    const byokProvider = overrideProvider || (byokId ? byokList.find((p) => p.id === byokId) : null);
 
     const response = byokProvider
       ? await fetch(`${byokProvider.baseUrl}/chat/completions`, {
@@ -397,6 +405,12 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
         toast.error("Rate limited."); throw new Error("rate-limit");
       }
       if (response.status === 402) {
+        if (!byokProvider && byokList.length > 0 && retry === 0) {
+          const fallback = byokList[0];
+          setSelectedModel({ id: `byok:${fallback.id}`, name: fallback.name, description: fallback.model });
+          toast.info(`💳 Lovable credits exhausted — switched to ${fallback.name}`, { duration: 6000 });
+          return streamRaw(msgs, retry + 1, fallback);
+        }
         toast.error("💳 Credits exhausted", {
           description: byokList.length > 0 ? "Switch to a BYOK provider in the model dropdown." : "Add credits or add your own API key (BYOK).",
         });
