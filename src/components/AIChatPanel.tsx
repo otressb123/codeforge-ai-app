@@ -274,7 +274,7 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
           setSelectedModel({ id: `byok:${fallback.id}`, name: fallback.name, description: fallback.model });
           toast.info(`💳 Lovable credits exhausted — switched to ${fallback.name} (${fallback.model})`, { duration: 6000 });
           // Retry with the new model selection (state updates next render, so pass override via closure)
-          return streamChatWithProvider(allMessages, screenshot, fallback);
+          return streamChat(allMessages, screenshot, retryCount + 1, fallback);
         }
         toast.error("💳 AI credits exhausted", {
           description: byokList.length > 0
