@@ -200,7 +200,7 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
     );
   }, [contextEnabled, projectFiles]);
 
-  const streamChat = async (allMessages: Message[], screenshot?: string | null, retryCount = 0): Promise<string> => {
+  const streamChat = async (allMessages: Message[], screenshot?: string | null, retryCount = 0, overrideProvider?: BYOKProvider): Promise<string> => {
     const MAX_RETRIES = 3;
     let messagesToSend = [...allMessages];
 
