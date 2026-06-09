@@ -217,7 +217,7 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
 
     // BYOK: stream directly from user's provider (OpenAI-compatible)
     const byokId = selectedModel.id.startsWith("byok:") ? selectedModel.id.slice(5) : null;
-    const byokProvider = byokId ? byokList.find((p) => p.id === byokId) : null;
+    const byokProvider = overrideProvider || (byokId ? byokList.find((p) => p.id === byokId) : null);
 
     const response = byokProvider
       ? await fetch(`${byokProvider.baseUrl}/chat/completions`, {
