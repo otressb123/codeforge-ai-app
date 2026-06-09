@@ -362,10 +362,10 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
 
   // Direct streaming for agent loop — appends to last assistant message
   // Auto-retries on 429 with exponential backoff so the agent doesn't die mid-task.
-  const streamRaw = async (msgs: Message[], retry = 0): Promise<string> => {
+  const streamRaw = async (msgs: Message[], retry = 0, overrideProvider?: BYOKProvider): Promise<string> => {
     const MAX_RETRY = 4;
     const byokId = selectedModel.id.startsWith("byok:") ? selectedModel.id.slice(5) : null;
-    const byokProvider = byokId ? byokList.find((p) => p.id === byokId) : null;
+    const byokProvider = overrideProvider || (byokId ? byokList.find((p) => p.id === byokId) : null);
 
     const response = byokProvider
       ? await fetch(`${byokProvider.baseUrl}/chat/completions`, {
