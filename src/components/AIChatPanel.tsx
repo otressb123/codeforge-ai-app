@@ -405,6 +405,12 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
         toast.error("Rate limited."); throw new Error("rate-limit");
       }
       if (response.status === 402) {
+        if (!byokProvider && byokList.length > 0 && retry === 0) {
+          const fallback = byokList[0];
+          setSelectedModel({ id: `byok:${fallback.id}`, name: fallback.name, description: fallback.model });
+          toast.info(`💳 Lovable credits exhausted — switched to ${fallback.name}`, { duration: 6000 });
+          return streamRaw(msgs, retry + 1, fallback);
+        }
         toast.error("💳 Credits exhausted", {
           description: byokList.length > 0 ? "Switch to a BYOK provider in the model dropdown." : "Add credits or add your own API key (BYOK).",
         });
