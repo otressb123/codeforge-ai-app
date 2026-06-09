@@ -268,6 +268,14 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
         throw new Error("Rate limit exceeded after retries");
       }
       if (response.status === 402) {
+        // Auto-fallback: if user has a BYOK provider configured, switch to it and retry once.
+        if (!byokProvider && byokList.length > 0 && retryCount === 0) {
+          const fallback = byokList[0];
+          setSelectedModel({ id: `byok:${fallback.id}`, name: fallback.name, description: fallback.model });
+          toast.info(`💳 Lovable credits exhausted — switched to ${fallback.name} (${fallback.model})`, { duration: 6000 });
+          // Retry with the new model selection (state updates next render, so pass override via closure)
+          return streamChatWithProvider(allMessages, screenshot, fallback);
+        }
         toast.error("💳 AI credits exhausted", {
           description: byokList.length > 0
             ? "Switch to one of your BYOK providers in the model dropdown to keep working."
