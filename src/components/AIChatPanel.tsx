@@ -356,20 +356,36 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
   // Auto-retries on 429 with exponential backoff so the agent doesn't die mid-task.
   const streamRaw = async (msgs: Message[], retry = 0): Promise<string> => {
     const MAX_RETRY = 4;
-    const response = await fetch(CHAT_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-      },
-      body: JSON.stringify({
-        messages: msgs,
-        model: selectedModel.id === "auto" ? routeModel(msgs[msgs.length - 1]?.content || "", "agent") : selectedModel.id,
-        mode: "agent",
-        projectMemory: memoryToPrompt(loadProjectMemory()),
-        projectFiles: getProjectContext(),
-      }),
-    });
+    const byokId = selectedModel.id.startsWith("byok:") ? selectedModel.id.slice(5) : null;
+    const byokProvider = byokId ? byokList.find((p) => p.id === byokId) : null;
+
+    const response = byokProvider
+      ? await fetch(`${byokProvider.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${byokProvider.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: byokProvider.model,
+            stream: true,
+            messages: msgs,
+          }),
+        })
+      : await fetch(CHAT_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            messages: msgs,
+            model: selectedModel.id === "auto" ? routeModel(msgs[msgs.length - 1]?.content || "", "agent") : selectedModel.id,
+            mode: "agent",
+            projectMemory: memoryToPrompt(loadProjectMemory()),
+            projectFiles: getProjectContext(),
+          }),
+        });
     if (!response.ok) {
       if (response.status === 429) {
         if (retry < MAX_RETRY) {
@@ -380,7 +396,12 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
         }
         toast.error("Rate limited."); throw new Error("rate-limit");
       }
-      if (response.status === 402) { toast.error("Credits exhausted."); throw new Error("no-credits"); }
+      if (response.status === 402) {
+        toast.error("💳 Credits exhausted", {
+          description: byokList.length > 0 ? "Switch to a BYOK provider in the model dropdown." : "Add credits or add your own API key (BYOK).",
+        });
+        throw new Error("no-credits");
+      }
       throw new Error("AI request failed");
     }
     if (!response.body) throw new Error("no body");
