@@ -269,8 +269,13 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
       }
       if (response.status === 402) {
         toast.error("💳 AI credits exhausted", {
-          description: "Add more credits in Settings → Workspace → Usage to continue.",
-          duration: 10000,
+          description: byokList.length > 0
+            ? "Switch to one of your BYOK providers in the model dropdown to keep working."
+            : "Add credits in Workspace → Usage, or add your own key via the key icon (BYOK).",
+          duration: 12000,
+          action: byokList.length === 0
+            ? { label: "Add key", onClick: () => setByokOpen(true) }
+            : undefined,
         });
         throw new Error("AI credits exhausted");
       }
