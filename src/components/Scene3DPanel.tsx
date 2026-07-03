@@ -6,8 +6,9 @@ import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Box, Circle, Square, Cylinder, Trees, Building2, Sparkles, Trash2, Download, Upload, Sun, User, Eye } from "lucide-react";
+import { Box, Circle, Square, Cylinder, Trees, Building2, Sparkles, Trash2, Download, Upload, Sun, User, Eye, Wand2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 type SceneObject = {
   id: string;
@@ -25,6 +26,8 @@ const Scene3DPanel = () => {
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
   const [prompt, setPrompt] = useState("modern downtown with 5x5 blocks and a park");
+  const [aiPrompt, setAiPrompt] = useState("futuristic neon city with skyscrapers, cars on roads and a central lake");
+  const [aiLoading, setAiLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // ── Init three.js ──────────────────────────────────────────────────────
@@ -227,6 +230,85 @@ const Scene3DPanel = () => {
     toast.success(`Generated scene (${group.children.length} objects)`);
   };
 
+  // ── AI Scene Generator (Lovable AI structured output) ─────────────────
+  const generateFromAI = async () => {
+    if (!aiPrompt.trim() || aiLoading) return;
+    setAiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("scene-ai", {
+        body: { prompt: aiPrompt.trim() },
+      });
+      if (error) {
+        const msg = (error as any).message ?? "";
+        if (/402|credit/i.test(msg)) toast.error("AI credits exhausted", { description: "Add credits or use offline procedural generator" });
+        else if (/429/.test(msg)) toast.error("Rate limited");
+        else toast.error(msg || "AI scene failed");
+        return;
+      }
+      const scene: { name?: string; objects?: any[] } = data?.scene ?? {};
+      const objs = Array.isArray(scene.objects) ? scene.objects : [];
+      if (objs.length === 0) { toast.error("AI returned no objects"); return; }
+
+      const group = new THREE.Group();
+      const parseColor = (c?: string) => {
+        try { return new THREE.Color(c ?? "#64748b").getHex(); } catch { return 0x64748b; }
+      };
+
+      for (const o of objs) {
+        const color = parseColor(o.color);
+        const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.2 });
+        let mesh: THREE.Object3D | null = null;
+        const sx = Number(o.sx ?? 1), sy = Number(o.sy ?? 1), sz = Number(o.sz ?? 1);
+
+        switch (o.kind) {
+          case "box": mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat); break;
+          case "sphere": mesh = new THREE.Mesh(new THREE.SphereGeometry(Math.max(0.2, sx / 2), 24, 24), mat); break;
+          case "cylinder": mesh = new THREE.Mesh(new THREE.CylinderGeometry(sx / 2, sx / 2, sy, 24), mat); break;
+          case "cone": mesh = new THREE.Mesh(new THREE.ConeGeometry(sx / 2, sy, 16), mat); break;
+          case "road": mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.05, sz), new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.95 })); break;
+          case "water": mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.1, sz), new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.2, metalness: 0.6, transparent: true, opacity: 0.75 })); break;
+          case "car": {
+            const g = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 3), mat);
+            body.position.y = 0.35;
+            const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 1.6), new THREE.MeshStandardMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.6 }));
+            cabin.position.y = 0.85;
+            g.add(body, cabin);
+            mesh = g; break;
+          }
+          case "tree": {
+            const g = new THREE.Group();
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 1.2, 8), new THREE.MeshStandardMaterial({ color: 0x6b3a1a }));
+            trunk.position.y = 0.6;
+            const leaves = new THREE.Mesh(new THREE.ConeGeometry(0.9, 2, 8), new THREE.MeshStandardMaterial({ color: 0x10b981 }));
+            leaves.position.y = 2;
+            g.add(trunk, leaves); mesh = g; break;
+          }
+          case "human": {
+            const g = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 8, 16), mat);
+            body.position.y = 0.9;
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 24, 24), new THREE.MeshStandardMaterial({ color: 0xfde68a }));
+            head.position.y = 1.9;
+            g.add(body, head); mesh = g; break;
+          }
+        }
+
+        if (!mesh) continue;
+        mesh.position.set(Number(o.x ?? 0), Number(o.y ?? 0), Number(o.z ?? 0));
+        mesh.traverse((c) => { if ((c as THREE.Mesh).isMesh) (c as THREE.Mesh).castShadow = true; });
+        group.add(mesh);
+      }
+
+      addObject(group, `ai: "${(scene.name || aiPrompt).slice(0, 26)}"`);
+      toast.success(`AI built ${group.children.length} objects`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "AI scene failed");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   // ── Import / Export ───────────────────────────────────────────────────
   const handleImportGLTF = (file: File) => {
     const url = URL.createObjectURL(file);
@@ -302,6 +384,29 @@ const Scene3DPanel = () => {
 
       {/* Viewport */}
       <div ref={mountRef} className="relative h-64 border-b border-border bg-[#0a0e1a]" />
+
+      {/* AI Scene Builder */}
+      <div className="px-3 py-2 border-b border-border bg-gradient-to-br from-primary/5 to-accent/5">
+        <label className="text-[10px] uppercase tracking-wide text-primary flex items-center gap-1 mb-1">
+          <Wand2 className="w-3 h-3" /> AI Scene Builder
+        </label>
+        <div className="flex gap-1">
+          <Input
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            placeholder="describe your world: 'medieval village near a river'"
+            className="h-7 text-xs"
+            disabled={aiLoading}
+            onKeyDown={(e) => e.key === "Enter" && generateFromAI()}
+          />
+          <Button size="sm" className="h-7 px-2" onClick={generateFromAI} disabled={aiLoading}>
+            {aiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+          </Button>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1">
+          AI composes buildings, roads, trees, cars, humans and water into a real layout.
+        </p>
+      </div>
 
       {/* AI prompt */}
       <div className="px-3 py-2 border-b border-border bg-secondary/30">
