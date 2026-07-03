@@ -6,8 +6,9 @@ import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Box, Circle, Square, Cylinder, Trees, Building2, Sparkles, Trash2, Download, Upload, Sun, User, Eye } from "lucide-react";
+import { Box, Circle, Square, Cylinder, Trees, Building2, Sparkles, Trash2, Download, Upload, Sun, User, Eye, Wand2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 type SceneObject = {
   id: string;
