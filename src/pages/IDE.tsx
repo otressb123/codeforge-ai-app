@@ -27,13 +27,14 @@ import GitLabDialog from "@/components/GitLabDialog";
 import ExportImportDialog from "@/components/ExportImportDialog";
 import CollabPanel from "@/components/CollabPanel";
 import Scene3DPanel from "@/components/Scene3DPanel";
+import ImageStudioPanel from "@/components/ImageStudioPanel";
 import CommandPalette from "@/components/CommandPalette";
 import StatusBar from "@/components/StatusBar";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
-type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "scene";
+type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "scene" | "imagestudio";
 
 interface OpenFile {
   path: string;
@@ -667,6 +668,8 @@ const IDE = () => {
         return <CollabPanel currentFile={activeFile ?? undefined} />;
       case "scene":
         return <Scene3DPanel />;
+      case "imagestudio":
+        return <ImageStudioPanel />;
       case "settings":
         return (
           <SettingsPanel
