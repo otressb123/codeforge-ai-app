@@ -385,6 +385,29 @@ const Scene3DPanel = () => {
       {/* Viewport */}
       <div ref={mountRef} className="relative h-64 border-b border-border bg-[#0a0e1a]" />
 
+      {/* AI Scene Builder */}
+      <div className="px-3 py-2 border-b border-border bg-gradient-to-br from-primary/5 to-accent/5">
+        <label className="text-[10px] uppercase tracking-wide text-primary flex items-center gap-1 mb-1">
+          <Wand2 className="w-3 h-3" /> AI Scene Builder
+        </label>
+        <div className="flex gap-1">
+          <Input
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            placeholder="describe your world: 'medieval village near a river'"
+            className="h-7 text-xs"
+            disabled={aiLoading}
+            onKeyDown={(e) => e.key === "Enter" && generateFromAI()}
+          />
+          <Button size="sm" className="h-7 px-2" onClick={generateFromAI} disabled={aiLoading}>
+            {aiLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+          </Button>
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1">
+          AI composes buildings, roads, trees, cars, humans and water into a real layout.
+        </p>
+      </div>
+
       {/* AI prompt */}
       <div className="px-3 py-2 border-b border-border bg-secondary/30">
         <label className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1 mb-1">
