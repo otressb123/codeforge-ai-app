@@ -26,6 +26,8 @@ const Scene3DPanel = () => {
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
   const [prompt, setPrompt] = useState("modern downtown with 5x5 blocks and a park");
+  const [aiPrompt, setAiPrompt] = useState("futuristic neon city with skyscrapers, cars on roads and a central lake");
+  const [aiLoading, setAiLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // ── Init three.js ──────────────────────────────────────────────────────
