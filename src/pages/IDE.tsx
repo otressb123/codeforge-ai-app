@@ -667,6 +667,8 @@ const IDE = () => {
         return <CollabPanel currentFile={activeFile ?? undefined} />;
       case "scene":
         return <Scene3DPanel />;
+      case "imagestudio":
+        return <ImageStudioPanel />;
       case "settings":
         return (
           <SettingsPanel
