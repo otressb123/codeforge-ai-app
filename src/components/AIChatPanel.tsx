@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
-import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText, Brain, Zap, Cpu, Wrench, Palette, Lightbulb, Layout, Terminal, KeyRound, Plus } from "lucide-react";
+import { Send, Sparkles, Bot, User, Loader2, Trash2, Copy, Check, ChevronDown, Eye, EyeOff, CheckCircle2, Camera, FileText, Brain, Zap, Cpu, Wrench, Palette, Lightbulb, Layout, Terminal, KeyRound, Plus, Rocket } from "lucide-react";
 import { loadProjectMemory, memoryToPrompt } from "@/lib/projectMemory";
 import { parseToolCalls, executeTool, ASYNC_TOOLS, type ToolResult, type ToolCall } from "@/lib/agentTools";
 import { motion, AnimatePresence } from "framer-motion";
@@ -601,6 +601,32 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
     }
   };
 
+  // ─── ONE-SHOT AUTO-BUILD ────────────────────────────────────────────
+  // Force agent brain, wrap the user's brief with a plan → build → verify
+  // meta-prompt, and let runAgentLoop iterate until it emits tool:done.
+  const handleAutoBuild = async () => {
+    if (!input.trim() || isLoading) return;
+    if (!onAgentApply) { toast.error("Auto-Build needs agent tools (open IDE)"); return; }
+    const brief = input.trim();
+    if (brainMode !== "agent") setBrainMode("agent");
+    const wrapped = `[AUTO-BUILD MODE] Build this end-to-end in one shot. No clarifying questions.
+
+USER BRIEF: ${brief}
+
+Required workflow:
+1. tool:read /.codeforge/plan.md (write initial plan if missing).
+2. Read src/App.tsx to see current state.
+3. Create/overwrite all files needed with tool:write. Multi-page apps use react-router-dom.
+4. tool:screenshot to verify the UI renders.
+5. If broken: tool:read the failing file, tool:replace to fix, tool:screenshot again. Repeat up to 3 fix cycles.
+6. tool:done with a 1-2 line summary.
+
+Ship a complete, polished, interactive app. Beautiful dark UI, real mock data, framer-motion entrances.`;
+    setInput("");
+    toast.info("🚀 Auto-Build started — agent will plan, build, and self-verify");
+    await runAgentLoop(wrapped);
+  };
+
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
     if (brainMode === "agent" && onAgentApply) { await runAgentLoop(input); return; }
@@ -1053,6 +1079,14 @@ const AIChatPanel = forwardRef<AIChatPanelRef, AIChatPanelProps>(({ onCodeGenera
             rows={2}
             className="flex-1 bg-input border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground disabled:opacity-50 resize-none"
           />
+          <Button
+            onClick={handleAutoBuild}
+            disabled={!input.trim() || isLoading || !onAgentApply}
+            title="One-shot Auto-Build: agent plans, builds, screenshots, and self-fixes"
+            className="self-end bg-gradient-to-r from-cyan-500 to-violet-600 hover:opacity-90 text-white shadow-lg shadow-cyan-500/30"
+          >
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
+          </Button>
           <Button onClick={handleSend} disabled={!input.trim() || isLoading} className="bg-primary hover:bg-primary/90 text-primary-foreground glow-primary self-end">
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </Button>
