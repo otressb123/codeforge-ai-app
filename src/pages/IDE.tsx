@@ -28,6 +28,7 @@ import ExportImportDialog from "@/components/ExportImportDialog";
 import CollabPanel from "@/components/CollabPanel";
 import Scene3DPanel from "@/components/Scene3DPanel";
 import ImageStudioPanel from "@/components/ImageStudioPanel";
+import TemplateGallery from "@/components/TemplateGallery";
 import CommandPalette from "@/components/CommandPalette";
 import StatusBar from "@/components/StatusBar";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
