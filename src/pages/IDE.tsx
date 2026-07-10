@@ -28,13 +28,14 @@ import ExportImportDialog from "@/components/ExportImportDialog";
 import CollabPanel from "@/components/CollabPanel";
 import Scene3DPanel from "@/components/Scene3DPanel";
 import ImageStudioPanel from "@/components/ImageStudioPanel";
+import TemplateGallery from "@/components/TemplateGallery";
 import CommandPalette from "@/components/CommandPalette";
 import StatusBar from "@/components/StatusBar";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
-type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "scene" | "imagestudio";
+type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "scene" | "imagestudio" | "templates";
 
 interface OpenFile {
   path: string;
@@ -670,6 +671,8 @@ const IDE = () => {
         return <Scene3DPanel />;
       case "imagestudio":
         return <ImageStudioPanel />;
+      case "templates":
+        return <TemplateGallery onLoad={(name, tplFiles) => { pushSnapshot("Pre-template", files); handleNewProject(name, tplFiles); setPreviewKey(p => p + 1); }} />;
       case "settings":
         return (
           <SettingsPanel
