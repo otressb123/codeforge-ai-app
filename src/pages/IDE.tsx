@@ -671,6 +671,8 @@ const IDE = () => {
         return <Scene3DPanel />;
       case "imagestudio":
         return <ImageStudioPanel />;
+      case "templates":
+        return <TemplateGallery onLoad={(name, tplFiles) => { pushSnapshot("Pre-template", files); handleNewProject(name, tplFiles); setPreviewKey(p => p + 1); }} />;
       case "settings":
         return (
           <SettingsPanel
