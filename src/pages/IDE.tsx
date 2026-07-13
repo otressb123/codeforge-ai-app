@@ -27,6 +27,8 @@ import GitLabDialog from "@/components/GitLabDialog";
 import ExportImportDialog from "@/components/ExportImportDialog";
 import CollabPanel from "@/components/CollabPanel";
 import Scene3DPanel from "@/components/Scene3DPanel";
+import CharacterStudio from "@/components/CharacterStudio";
+import CityBuilder from "@/components/CityBuilder";
 import ImageStudioPanel from "@/components/ImageStudioPanel";
 import TemplateGallery from "@/components/TemplateGallery";
 import CommandPalette from "@/components/CommandPalette";
