@@ -15,6 +15,8 @@ const ActivityBar = ({ activeTab, onTabChange }: ActivityBarProps) => {
     { id: "ai" as SidebarTab, icon: Bot, label: "AI Assistant" },
     { id: "templates" as SidebarTab, icon: Sparkles, label: "Template Gallery" },
     { id: "imagestudio" as SidebarTab, icon: Wand2, label: "Image Studio" },
+    { id: "character" as SidebarTab, icon: User, label: "Character Studio" },
+    { id: "city" as SidebarTab, icon: Building, label: "City Builder" },
     { id: "memory" as SidebarTab, icon: Brain, label: "Project Memory" },
     { id: "history" as SidebarTab, icon: History, label: "Version History" },
     { id: "components" as SidebarTab, icon: Layers, label: "Components" },
