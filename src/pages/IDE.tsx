@@ -667,14 +667,10 @@ const IDE = () => {
         return <ProjectMemoryPanel />;
       case "collab":
         return <CollabPanel currentFile={activeFile ?? undefined} />;
-      case "scene":
-        return <Scene3DPanel />;
+      case "editor3d":
+        return <Editor3D />;
       case "imagestudio":
         return <ImageStudioPanel />;
-      case "character":
-        return <CharacterStudio />;
-      case "city":
-        return <CityBuilder />;
       case "templates":
         return <TemplateGallery onLoad={(name, tplFiles) => { pushSnapshot("Pre-template", files); handleNewProject(name, tplFiles); setPreviewKey(p => p + 1); }} />;
       case "settings":
