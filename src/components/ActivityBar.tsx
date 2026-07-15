@@ -1,7 +1,7 @@
-import { Files, Bot, Terminal, Settings, Search, Puzzle, GitBranch, Layers, FileText, Image, History, Brain, Users, Box, Wand2, Sparkles, User, Building } from "lucide-react";
+import { Files, Bot, Terminal, Settings, Search, Puzzle, GitBranch, Layers, FileText, Image, History, Brain, Users, Box, Wand2, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 
-type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "scene" | "imagestudio" | "templates" | "character" | "city";
+type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "editor3d" | "imagestudio" | "templates";
 
 interface ActivityBarProps {
   activeTab: SidebarTab;
@@ -15,8 +15,7 @@ const ActivityBar = ({ activeTab, onTabChange }: ActivityBarProps) => {
     { id: "ai" as SidebarTab, icon: Bot, label: "AI Assistant" },
     { id: "templates" as SidebarTab, icon: Sparkles, label: "Template Gallery" },
     { id: "imagestudio" as SidebarTab, icon: Wand2, label: "Image Studio" },
-    { id: "character" as SidebarTab, icon: User, label: "Character Studio" },
-    { id: "city" as SidebarTab, icon: Building, label: "City Builder" },
+    { id: "editor3d" as SidebarTab, icon: Box, label: "3D Editor (Scene · Character · City)" },
     { id: "memory" as SidebarTab, icon: Brain, label: "Project Memory" },
     { id: "history" as SidebarTab, icon: History, label: "Version History" },
     { id: "components" as SidebarTab, icon: Layers, label: "Components" },
@@ -24,7 +23,6 @@ const ActivityBar = ({ activeTab, onTabChange }: ActivityBarProps) => {
     { id: "assets" as SidebarTab, icon: Image, label: "Assets" },
     { id: "git" as SidebarTab, icon: GitBranch, label: "Source Control" },
     { id: "collab" as SidebarTab, icon: Users, label: "Live Collaboration" },
-    { id: "scene" as SidebarTab, icon: Box, label: "3D Scene Builder" },
     { id: "extensions" as SidebarTab, icon: Puzzle, label: "Extensions" },
     { id: "terminal" as SidebarTab, icon: Terminal, label: "Terminal" },
     { id: "settings" as SidebarTab, icon: Settings, label: "Settings" },
