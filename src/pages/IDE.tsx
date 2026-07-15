@@ -26,9 +26,7 @@ import GitHubDialog from "@/components/GitHubDialog";
 import GitLabDialog from "@/components/GitLabDialog";
 import ExportImportDialog from "@/components/ExportImportDialog";
 import CollabPanel from "@/components/CollabPanel";
-import Scene3DPanel from "@/components/Scene3DPanel";
-import CharacterStudio from "@/components/CharacterStudio";
-import CityBuilder from "@/components/CityBuilder";
+import Editor3D from "@/components/Editor3D";
 import ImageStudioPanel from "@/components/ImageStudioPanel";
 import TemplateGallery from "@/components/TemplateGallery";
 import CommandPalette from "@/components/CommandPalette";
@@ -37,7 +35,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
-type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "scene" | "imagestudio" | "templates" | "character" | "city";
+type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "editor3d" | "imagestudio" | "templates";
 
 interface OpenFile {
   path: string;
