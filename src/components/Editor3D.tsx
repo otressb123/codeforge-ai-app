@@ -728,9 +728,14 @@ const Editor3D = () => {
                 <Input placeholder="a medieval village near a river"
                   value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
                   className="h-8 text-xs mb-1" />
-                <Button size="sm" className="w-full h-7 text-[10px]" onClick={generateScene} disabled={aiBusy}>
-                  <Sparkles className="w-3 h-3 mr-1" />{aiBusy ? "Generating…" : "Generate"}
-                </Button>
+                <div className="grid grid-cols-2 gap-1">
+                  <Button size="sm" className="h-7 text-[10px]" onClick={() => generateScene(false)} disabled={aiBusy}>
+                    <Sparkles className="w-3 h-3 mr-1" />{aiBusy ? "…" : "Generate"}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => generateScene(true)} disabled={aiBusy}>
+                    <Plus className="w-3 h-3 mr-1" />Spawn
+                  </Button>
+                </div>
               </div>
               <Button size="sm" variant="outline" className="w-full h-7 text-[10px]"
                 onClick={() => { if (sceneGroupRef.current) { sceneRef.current!.remove(sceneGroupRef.current); sceneGroupRef.current = null; } }}>
