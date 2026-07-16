@@ -10,7 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Box as BoxIcon, User, Building2, Trees, Waves, Route, Car, Eraser,
-  Play, Pause, Download, Trash2, Wand2, RotateCcw, Sparkles,
+  Play, Pause, Download, Trash2, Wand2, RotateCcw, Sparkles, Gamepad2, Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -186,6 +186,13 @@ const Editor3D = () => {
   // Scene AI
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  // Walk-around play mode
+  const [walking, setWalking] = useState(false);
+  const walkingRef = useRef(false);
+  const keysRef = useRef<Record<string, boolean>>({});
+  const velYRef = useRef(0);
+  const yawRef = useRef(0);
+  walkingRef.current = walking;
 
   animRef.current = playing ? anim : "none";
 
@@ -329,9 +336,72 @@ const Editor3D = () => {
     renderer.domElement.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
 
+    // Keyboard for walk mode
+    const onKeyDown = (e: KeyboardEvent) => { keysRef.current[e.key.toLowerCase()] = true; };
+    const onKeyUp = (e: KeyboardEvent) => { keysRef.current[e.key.toLowerCase()] = false; };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+
     let raf = 0;
+    let prevT = 0;
     const tick = () => {
       const t = clockRef.current.getElapsedTime();
+      const dt = Math.min(0.05, t - prevT); prevT = t;
+
+      // ── Walk/play mode physics ──────────────────────────────
+      if (walkingRef.current && charGroupRef.current && rigRef.current) {
+        const k = keysRef.current;
+        const forward = (k["w"] || k["arrowup"]) ? 1 : (k["s"] || k["arrowdown"]) ? -1 : 0;
+        const strafe = (k["d"] || k["arrowright"]) ? 1 : (k["a"] || k["arrowleft"]) ? -1 : 0;
+        const running = !!k["shift"];
+        const speed = running ? 4.5 : 2.2;
+        const moving = forward !== 0 || strafe !== 0;
+
+        // Camera yaw controls facing direction
+        const camDir = new THREE.Vector3();
+        cam.getWorldDirection(camDir); camDir.y = 0; camDir.normalize();
+        const right = new THREE.Vector3().crossVectors(camDir, new THREE.Vector3(0, 1, 0)).normalize();
+
+        const move = new THREE.Vector3()
+          .addScaledVector(camDir, forward)
+          .addScaledVector(right, strafe);
+        if (move.lengthSq() > 0) {
+          move.normalize().multiplyScalar(speed * dt);
+          const root = charGroupRef.current;
+          const nextX = root.position.x + move.x;
+          const nextZ = root.position.z + move.z;
+          // Collision with buildings (AABB in grid space)
+          const collides = (nx: number, nz: number) => {
+            const cx = Math.floor(nx / CELL + GRID / 2);
+            const cz = Math.floor(nz / CELL + GRID / 2);
+            const cell = cityMapRef.current.get(cityKey(cx, cz));
+            return cell?.tool === "building";
+          };
+          if (!collides(nextX, root.position.z)) root.position.x = nextX;
+          if (!collides(root.position.x, nextZ)) root.position.z = nextZ;
+
+          // Face movement direction
+          yawRef.current = Math.atan2(move.x, move.z);
+          root.rotation.y = yawRef.current;
+        }
+
+        // Gravity (character always on ground here, but keep ready)
+        const root = charGroupRef.current;
+        velYRef.current -= 9.8 * dt;
+        root.position.y = Math.max(0, root.position.y + velYRef.current * dt);
+        if (root.position.y <= 0) { root.position.y = 0; velYRef.current = 0; }
+        if (k[" "] && root.position.y === 0) velYRef.current = 4.5; // jump
+
+        // Force walk/run anim when moving
+        animRef.current = moving ? (running ? "run" : "walk") : "idle";
+
+        // Third-person chase camera
+        const back = camDir.clone().multiplyScalar(-4);
+        const desired = new THREE.Vector3(root.position.x + back.x, root.position.y + 2.2, root.position.z + back.z);
+        cam.position.lerp(desired, 0.15);
+        ctrl.target.lerp(new THREE.Vector3(root.position.x, root.position.y + 1.2, root.position.z), 0.2);
+      }
+
       if (rigRef.current && animRef.current !== "none") animateRig(rigRef.current, animRef.current, t);
       ctrl.update();
       renderer.render(scene, cam);
@@ -351,6 +421,8 @@ const Editor3D = () => {
       renderer.domElement.removeEventListener("pointerdown", onDown);
       renderer.domElement.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
       renderer.dispose();
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
     };
@@ -370,18 +442,23 @@ const Editor3D = () => {
 
   // Toggle group visibility per mode (keep all alive so exports work)
   useEffect(() => {
-    if (charGroupRef.current) charGroupRef.current.visible = mode === "character";
-    if (cityGroupRef.current) cityGroupRef.current.visible = mode === "city";
+    // In walk mode we want to see both character AND city
+    const charVisible = mode === "character" || walking;
+    const cityVisible = mode === "city" || walking;
+    if (charGroupRef.current) charGroupRef.current.visible = charVisible;
+    if (cityGroupRef.current) cityGroupRef.current.visible = cityVisible;
     if (sceneGroupRef.current) sceneGroupRef.current.visible = mode === "scene";
-    // Reframe camera
+    // Reframe camera (skip while walking — chase cam owns it)
     const cam = cameraRef.current; const ctrl = ctrlRef.current;
-    if (cam && ctrl) {
+    if (cam && ctrl && !walking) {
       if (mode === "character") { cam.position.set(2.5, 1.8, 3.2); ctrl.target.set(0, 1, 0); }
       if (mode === "city")      { cam.position.set(18, 20, 22); ctrl.target.set(0, 0, 0); }
       if (mode === "scene")     { cam.position.set(12, 10, 14); ctrl.target.set(0, 1, 0); }
       ctrl.update();
     }
-  }, [mode]);
+    // Disable orbit dragging while walking so WASD owns input
+    if (ctrl) { ctrl.enableRotate = !walking; ctrl.enablePan = !walking; }
+  }, [mode, walking]);
 
   // Apply pose slider values to selected part's parent bone
   useEffect(() => {
@@ -431,16 +508,21 @@ const Editor3D = () => {
     toast.success(`Generated ${style}`);
   };
 
-  // ── Scene AI generate ──────────────────────────────────────
-  const generateScene = async () => {
+  // ── Scene AI generate (replace=full scene, append=spawn into existing) ─
+  const generateScene = async (append = false) => {
     if (!aiPrompt.trim()) return;
     setAiBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("scene-ai", { body: { prompt: aiPrompt } });
       if (error) throw error;
       const scene = data?.scene; if (!scene?.objects) throw new Error("Bad scene");
-      if (sceneGroupRef.current) sceneRef.current!.remove(sceneGroupRef.current);
-      const g = new THREE.Group(); g.name = "ai_scene";
+      let g = sceneGroupRef.current;
+      if (!append || !g) {
+        if (g) sceneRef.current!.remove(g);
+        g = new THREE.Group(); g.name = "ai_scene";
+        sceneRef.current!.add(g);
+        sceneGroupRef.current = g;
+      }
       for (const o of scene.objects) {
         const mat = new THREE.MeshStandardMaterial({ color: o.color || "#64748b", roughness: 0.7 });
         let mesh: THREE.Object3D | null = null;
@@ -453,8 +535,7 @@ const Editor3D = () => {
         else mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
         if (mesh) { mesh.position.set(o.x || 0, o.y || 0, o.z || 0); g.add(mesh); }
       }
-      sceneRef.current!.add(g); sceneGroupRef.current = g;
-      toast.success(`Generated ${scene.objects.length} objects`);
+      toast.success(`${append ? "Spawned" : "Generated"} ${scene.objects.length} objects`);
     } catch (e: any) {
       toast.error("Scene generation failed", { description: e?.message });
     } finally { setAiBusy(false); }
@@ -488,16 +569,37 @@ const Editor3D = () => {
   return (
     <div className="h-full flex flex-col bg-card">
       <div className="px-3 py-2 border-b border-border">
-        <div className="flex items-center gap-2 mb-1">
-          <BoxIcon className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-semibold">3D Editor</h3>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <BoxIcon className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold">3D Editor</h3>
+          </div>
+          <Button
+            size="sm"
+            variant={walking ? "default" : "outline"}
+            className="h-6 text-[10px] px-2"
+            onClick={() => {
+              const next = !walking;
+              setWalking(next);
+              if (next) toast.success("Walk mode: WASD move · Shift run · Space jump · drag to look");
+              else {
+                // Reset character to origin when exiting
+                if (charGroupRef.current) charGroupRef.current.position.set(0, 0, 0);
+              }
+            }}
+            title="Walk-around play mode"
+          >
+            <Gamepad2 className="w-3 h-3 mr-1" />
+            {walking ? "Stop" : "Play"}
+          </Button>
         </div>
         <div className="flex gap-1">
           {(["character", "city", "scene"] as Mode[]).map((m) => {
             const Icon = m === "character" ? User : m === "city" ? Building2 : Sparkles;
             return (
               <Button key={m} size="sm" variant={mode === m ? "default" : "outline"}
-                className="h-7 text-[10px] flex-1" onClick={() => setMode(m)}>
+                className="h-7 text-[10px] flex-1" onClick={() => setMode(m)}
+                disabled={walking}>
                 <Icon className="w-3 h-3 mr-1" />{m}
               </Button>
             );
@@ -506,6 +608,11 @@ const Editor3D = () => {
       </div>
 
       <div ref={mountRef} className="h-72 border-b border-border bg-[#0a0e1a]" />
+      {walking && (
+        <div className="px-3 py-1 text-[10px] text-primary bg-primary/10 border-b border-border">
+          🎮 WASD move · Shift run · Space jump · Click canvas + drag to look
+        </div>
+      )}
 
       <ScrollArea className="flex-1">
         <div className="p-3 space-y-3 text-xs">
@@ -621,9 +728,14 @@ const Editor3D = () => {
                 <Input placeholder="a medieval village near a river"
                   value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)}
                   className="h-8 text-xs mb-1" />
-                <Button size="sm" className="w-full h-7 text-[10px]" onClick={generateScene} disabled={aiBusy}>
-                  <Sparkles className="w-3 h-3 mr-1" />{aiBusy ? "Generating…" : "Generate"}
-                </Button>
+                <div className="grid grid-cols-2 gap-1">
+                  <Button size="sm" className="h-7 text-[10px]" onClick={() => generateScene(false)} disabled={aiBusy}>
+                    <Sparkles className="w-3 h-3 mr-1" />{aiBusy ? "…" : "Generate"}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => generateScene(true)} disabled={aiBusy}>
+                    <Plus className="w-3 h-3 mr-1" />Spawn
+                  </Button>
+                </div>
               </div>
               <Button size="sm" variant="outline" className="w-full h-7 text-[10px]"
                 onClick={() => { if (sceneGroupRef.current) { sceneRef.current!.remove(sceneGroupRef.current); sceneGroupRef.current = null; } }}>
