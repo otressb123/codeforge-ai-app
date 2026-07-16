@@ -186,6 +186,13 @@ const Editor3D = () => {
   // Scene AI
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  // Walk-around play mode
+  const [walking, setWalking] = useState(false);
+  const walkingRef = useRef(false);
+  const keysRef = useRef<Record<string, boolean>>({});
+  const velYRef = useRef(0);
+  const yawRef = useRef(0);
+  walkingRef.current = walking;
 
   animRef.current = playing ? anim : "none";
 
