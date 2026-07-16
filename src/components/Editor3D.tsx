@@ -336,9 +336,72 @@ const Editor3D = () => {
     renderer.domElement.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
 
+    // Keyboard for walk mode
+    const onKeyDown = (e: KeyboardEvent) => { keysRef.current[e.key.toLowerCase()] = true; };
+    const onKeyUp = (e: KeyboardEvent) => { keysRef.current[e.key.toLowerCase()] = false; };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+
     let raf = 0;
+    let prevT = 0;
     const tick = () => {
       const t = clockRef.current.getElapsedTime();
+      const dt = Math.min(0.05, t - prevT); prevT = t;
+
+      // ── Walk/play mode physics ──────────────────────────────
+      if (walkingRef.current && charGroupRef.current && rigRef.current) {
+        const k = keysRef.current;
+        const forward = (k["w"] || k["arrowup"]) ? 1 : (k["s"] || k["arrowdown"]) ? -1 : 0;
+        const strafe = (k["d"] || k["arrowright"]) ? 1 : (k["a"] || k["arrowleft"]) ? -1 : 0;
+        const running = !!k["shift"];
+        const speed = running ? 4.5 : 2.2;
+        const moving = forward !== 0 || strafe !== 0;
+
+        // Camera yaw controls facing direction
+        const camDir = new THREE.Vector3();
+        cam.getWorldDirection(camDir); camDir.y = 0; camDir.normalize();
+        const right = new THREE.Vector3().crossVectors(camDir, new THREE.Vector3(0, 1, 0)).normalize();
+
+        const move = new THREE.Vector3()
+          .addScaledVector(camDir, forward)
+          .addScaledVector(right, strafe);
+        if (move.lengthSq() > 0) {
+          move.normalize().multiplyScalar(speed * dt);
+          const root = charGroupRef.current;
+          const nextX = root.position.x + move.x;
+          const nextZ = root.position.z + move.z;
+          // Collision with buildings (AABB in grid space)
+          const collides = (nx: number, nz: number) => {
+            const cx = Math.floor(nx / CELL + GRID / 2);
+            const cz = Math.floor(nz / CELL + GRID / 2);
+            const cell = cityMapRef.current.get(cityKey(cx, cz));
+            return cell?.tool === "building";
+          };
+          if (!collides(nextX, root.position.z)) root.position.x = nextX;
+          if (!collides(root.position.x, nextZ)) root.position.z = nextZ;
+
+          // Face movement direction
+          yawRef.current = Math.atan2(move.x, move.z);
+          root.rotation.y = yawRef.current;
+        }
+
+        // Gravity (character always on ground here, but keep ready)
+        const root = charGroupRef.current;
+        velYRef.current -= 9.8 * dt;
+        root.position.y = Math.max(0, root.position.y + velYRef.current * dt);
+        if (root.position.y <= 0) { root.position.y = 0; velYRef.current = 0; }
+        if (k[" "] && root.position.y === 0) velYRef.current = 4.5; // jump
+
+        // Force walk/run anim when moving
+        animRef.current = moving ? (running ? "run" : "walk") : "idle";
+
+        // Third-person chase camera
+        const back = camDir.clone().multiplyScalar(-4);
+        const desired = new THREE.Vector3(root.position.x + back.x, root.position.y + 2.2, root.position.z + back.z);
+        cam.position.lerp(desired, 0.15);
+        ctrl.target.lerp(new THREE.Vector3(root.position.x, root.position.y + 1.2, root.position.z), 0.2);
+      }
+
       if (rigRef.current && animRef.current !== "none") animateRig(rigRef.current, animRef.current, t);
       ctrl.update();
       renderer.render(scene, cam);
