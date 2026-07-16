@@ -565,16 +565,37 @@ const Editor3D = () => {
   return (
     <div className="h-full flex flex-col bg-card">
       <div className="px-3 py-2 border-b border-border">
-        <div className="flex items-center gap-2 mb-1">
-          <BoxIcon className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-semibold">3D Editor</h3>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <BoxIcon className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold">3D Editor</h3>
+          </div>
+          <Button
+            size="sm"
+            variant={walking ? "default" : "outline"}
+            className="h-6 text-[10px] px-2"
+            onClick={() => {
+              const next = !walking;
+              setWalking(next);
+              if (next) toast.success("Walk mode: WASD move · Shift run · Space jump · drag to look");
+              else {
+                // Reset character to origin when exiting
+                if (charGroupRef.current) charGroupRef.current.position.set(0, 0, 0);
+              }
+            }}
+            title="Walk-around play mode"
+          >
+            <Gamepad2 className="w-3 h-3 mr-1" />
+            {walking ? "Stop" : "Play"}
+          </Button>
         </div>
         <div className="flex gap-1">
           {(["character", "city", "scene"] as Mode[]).map((m) => {
             const Icon = m === "character" ? User : m === "city" ? Building2 : Sparkles;
             return (
               <Button key={m} size="sm" variant={mode === m ? "default" : "outline"}
-                className="h-7 text-[10px] flex-1" onClick={() => setMode(m)}>
+                className="h-7 text-[10px] flex-1" onClick={() => setMode(m)}
+                disabled={walking}>
                 <Icon className="w-3 h-3 mr-1" />{m}
               </Button>
             );
@@ -583,6 +604,11 @@ const Editor3D = () => {
       </div>
 
       <div ref={mountRef} className="h-72 border-b border-border bg-[#0a0e1a]" />
+      {walking && (
+        <div className="px-3 py-1 text-[10px] text-primary bg-primary/10 border-b border-border">
+          🎮 WASD move · Shift run · Space jump · Click canvas + drag to look
+        </div>
+      )}
 
       <ScrollArea className="flex-1">
         <div className="p-3 space-y-3 text-xs">
