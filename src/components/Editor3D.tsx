@@ -10,7 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Box as BoxIcon, User, Building2, Trees, Waves, Route, Car, Eraser,
-  Play, Pause, Download, Trash2, Wand2, RotateCcw, Sparkles,
+  Play, Pause, Download, Trash2, Wand2, RotateCcw, Sparkles, Gamepad2, Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
