@@ -508,16 +508,21 @@ const Editor3D = () => {
     toast.success(`Generated ${style}`);
   };
 
-  // ── Scene AI generate ──────────────────────────────────────
-  const generateScene = async () => {
+  // ── Scene AI generate (replace=full scene, append=spawn into existing) ─
+  const generateScene = async (append = false) => {
     if (!aiPrompt.trim()) return;
     setAiBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("scene-ai", { body: { prompt: aiPrompt } });
       if (error) throw error;
       const scene = data?.scene; if (!scene?.objects) throw new Error("Bad scene");
-      if (sceneGroupRef.current) sceneRef.current!.remove(sceneGroupRef.current);
-      const g = new THREE.Group(); g.name = "ai_scene";
+      let g = sceneGroupRef.current;
+      if (!append || !g) {
+        if (g) sceneRef.current!.remove(g);
+        g = new THREE.Group(); g.name = "ai_scene";
+        sceneRef.current!.add(g);
+        sceneGroupRef.current = g;
+      }
       for (const o of scene.objects) {
         const mat = new THREE.MeshStandardMaterial({ color: o.color || "#64748b", roughness: 0.7 });
         let mesh: THREE.Object3D | null = null;
@@ -530,8 +535,7 @@ const Editor3D = () => {
         else mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
         if (mesh) { mesh.position.set(o.x || 0, o.y || 0, o.z || 0); g.add(mesh); }
       }
-      sceneRef.current!.add(g); sceneGroupRef.current = g;
-      toast.success(`Generated ${scene.objects.length} objects`);
+      toast.success(`${append ? "Spawned" : "Generated"} ${scene.objects.length} objects`);
     } catch (e: any) {
       toast.error("Scene generation failed", { description: e?.message });
     } finally { setAiBusy(false); }
