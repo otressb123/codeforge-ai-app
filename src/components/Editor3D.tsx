@@ -442,18 +442,23 @@ const Editor3D = () => {
 
   // Toggle group visibility per mode (keep all alive so exports work)
   useEffect(() => {
-    if (charGroupRef.current) charGroupRef.current.visible = mode === "character";
-    if (cityGroupRef.current) cityGroupRef.current.visible = mode === "city";
+    // In walk mode we want to see both character AND city
+    const charVisible = mode === "character" || walking;
+    const cityVisible = mode === "city" || walking;
+    if (charGroupRef.current) charGroupRef.current.visible = charVisible;
+    if (cityGroupRef.current) cityGroupRef.current.visible = cityVisible;
     if (sceneGroupRef.current) sceneGroupRef.current.visible = mode === "scene";
-    // Reframe camera
+    // Reframe camera (skip while walking — chase cam owns it)
     const cam = cameraRef.current; const ctrl = ctrlRef.current;
-    if (cam && ctrl) {
+    if (cam && ctrl && !walking) {
       if (mode === "character") { cam.position.set(2.5, 1.8, 3.2); ctrl.target.set(0, 1, 0); }
       if (mode === "city")      { cam.position.set(18, 20, 22); ctrl.target.set(0, 0, 0); }
       if (mode === "scene")     { cam.position.set(12, 10, 14); ctrl.target.set(0, 1, 0); }
       ctrl.update();
     }
-  }, [mode]);
+    // Disable orbit dragging while walking so WASD owns input
+    if (ctrl) { ctrl.enableRotate = !walking; ctrl.enablePan = !walking; }
+  }, [mode, walking]);
 
   // Apply pose slider values to selected part's parent bone
   useEffect(() => {
