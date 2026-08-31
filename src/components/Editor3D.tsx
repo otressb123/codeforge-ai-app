@@ -185,7 +185,19 @@ const Editor3D = () => {
   const posePartRef = useRef<string | null>(null);
 
   const [mode, setMode] = useState<Mode>("character");
+  // Modeling state
+  const modelGroupRef = useRef<THREE.Group | null>(null);
+  const selMeshRef = useRef<THREE.Mesh | null>(null);
+  const [modelItems, setModelItems] = useState<{ id: number; name: string }[]>([]);
+  const [selModelId, setSelModelId] = useState<number | null>(null);
+  const [prim, setPrim] = useState<Prim>("box");
+  const [mColor, setMColor] = useState("#22d3ee");
+  const [mPos, setMPos] = useState<[number, number, number]>([0, 0.5, 0]);
+  const [mRot, setMRot] = useState<[number, number, number]>([0, 0, 0]);
+  const [mScale, setMScale] = useState<[number, number, number]>([1, 1, 1]);
+  const [mWire, setMWire] = useState(false);
   // Character state
+
   const [preset, setPreset] = useState<Preset>("hero");
   const [height, setHeight] = useState(1.0);
   const [headScale, setHeadScale] = useState(1.0);
