@@ -353,6 +353,24 @@ const Editor3D = () => {
       const m = (renderer.domElement.dataset.mode || "character") as Mode;
       if (m === "city") { paintingRef.current = true; paintCity(ev); }
       else if (m === "character") pickPart(ev);
+      else if (m === "model") {
+        const g = modelGroupRef.current; if (!g) return;
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, cam);
+        const hit = raycaster.intersectObjects(g.children, true)[0];
+        if (hit) {
+          const mesh = hit.object as THREE.Mesh;
+          selMeshRef.current = mesh;
+          setSelModelId((mesh.userData as any).id ?? null);
+          setMPos([mesh.position.x, mesh.position.y, mesh.position.z]);
+          setMRot([mesh.rotation.x, mesh.rotation.y, mesh.rotation.z]);
+          setMScale([mesh.scale.x, mesh.scale.y, mesh.scale.z]);
+          setMColor("#" + (mesh.material as THREE.MeshStandardMaterial).color.getHexString());
+        }
+      }
+
     };
     const onMove = (ev: PointerEvent) => {
       if (paintingRef.current && (renderer.domElement.dataset.mode as Mode) === "city") paintCity(ev);
