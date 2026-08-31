@@ -492,12 +492,15 @@ const Editor3D = () => {
     if (charGroupRef.current) charGroupRef.current.visible = charVisible;
     if (cityGroupRef.current) cityGroupRef.current.visible = cityVisible;
     if (sceneGroupRef.current) sceneGroupRef.current.visible = mode === "scene";
+    if (modelGroupRef.current) modelGroupRef.current.visible = mode === "model" || walking;
     // Reframe camera (skip while walking — chase cam owns it)
     const cam = cameraRef.current; const ctrl = ctrlRef.current;
     if (cam && ctrl && !walking) {
       if (mode === "character") { cam.position.set(2.5, 1.8, 3.2); ctrl.target.set(0, 1, 0); }
       if (mode === "city")      { cam.position.set(18, 20, 22); ctrl.target.set(0, 0, 0); }
       if (mode === "scene")     { cam.position.set(12, 10, 14); ctrl.target.set(0, 1, 0); }
+      if (mode === "model")     { cam.position.set(3, 2.4, 4); ctrl.target.set(0, 0.6, 0); }
+
       ctrl.update();
     }
     // Disable orbit dragging while walking so WASD owns input
