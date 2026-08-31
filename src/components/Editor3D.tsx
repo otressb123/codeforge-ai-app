@@ -11,14 +11,29 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Box as BoxIcon, User, Building2, Trees, Waves, Route, Car, Eraser,
   Play, Pause, Download, Trash2, Wand2, RotateCcw, Sparkles, Gamepad2, Plus,
+  Copy, FlipHorizontal2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 
-type Mode = "scene" | "character" | "city";
+type Mode = "scene" | "character" | "city" | "model";
 type Anim = "idle" | "walk" | "run" | "wave" | "none";
 type Tool = "building" | "road" | "tree" | "water" | "car" | "erase";
+
+// ─── From-scratch modeling primitives ───────────────────────────
+type Prim = "box" | "sphere" | "cylinder" | "cone" | "torus" | "plane";
+const makePrimGeometry = (p: Prim): THREE.BufferGeometry => {
+  switch (p) {
+    case "sphere": return new THREE.SphereGeometry(0.5, 24, 16);
+    case "cylinder": return new THREE.CylinderGeometry(0.4, 0.4, 1, 24);
+    case "cone": return new THREE.ConeGeometry(0.5, 1, 24);
+    case "torus": return new THREE.TorusGeometry(0.4, 0.15, 16, 32);
+    case "plane": return new THREE.PlaneGeometry(1, 1);
+    default: return new THREE.BoxGeometry(1, 1, 1);
+  }
+};
+
 
 // ─── City config ────────────────────────────────────────────────
 const GRID = 24;
@@ -171,7 +186,19 @@ const Editor3D = () => {
   const posePartRef = useRef<string | null>(null);
 
   const [mode, setMode] = useState<Mode>("character");
+  // Modeling state
+  const modelGroupRef = useRef<THREE.Group | null>(null);
+  const selMeshRef = useRef<THREE.Mesh | null>(null);
+  const [modelItems, setModelItems] = useState<{ id: number; name: string }[]>([]);
+  const [selModelId, setSelModelId] = useState<number | null>(null);
+  const [prim, setPrim] = useState<Prim>("box");
+  const [mColor, setMColor] = useState("#22d3ee");
+  const [mPos, setMPos] = useState<[number, number, number]>([0, 0.5, 0]);
+  const [mRot, setMRot] = useState<[number, number, number]>([0, 0, 0]);
+  const [mScale, setMScale] = useState<[number, number, number]>([1, 1, 1]);
+  const [mWire, setMWire] = useState(false);
   // Character state
+
   const [preset, setPreset] = useState<Preset>("hero");
   const [height, setHeight] = useState(1.0);
   const [headScale, setHeadScale] = useState(1.0);
@@ -327,6 +354,24 @@ const Editor3D = () => {
       const m = (renderer.domElement.dataset.mode || "character") as Mode;
       if (m === "city") { paintingRef.current = true; paintCity(ev); }
       else if (m === "character") pickPart(ev);
+      else if (m === "model") {
+        const g = modelGroupRef.current; if (!g) return;
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, cam);
+        const hit = raycaster.intersectObjects(g.children, true)[0];
+        if (hit) {
+          const mesh = hit.object as THREE.Mesh;
+          selMeshRef.current = mesh;
+          setSelModelId((mesh.userData as any).id ?? null);
+          setMPos([mesh.position.x, mesh.position.y, mesh.position.z]);
+          setMRot([mesh.rotation.x, mesh.rotation.y, mesh.rotation.z]);
+          setMScale([mesh.scale.x, mesh.scale.y, mesh.scale.z]);
+          setMColor("#" + (mesh.material as THREE.MeshStandardMaterial).color.getHexString());
+        }
+      }
+
     };
     const onMove = (ev: PointerEvent) => {
       if (paintingRef.current && (renderer.domElement.dataset.mode as Mode) === "city") paintCity(ev);
@@ -448,12 +493,15 @@ const Editor3D = () => {
     if (charGroupRef.current) charGroupRef.current.visible = charVisible;
     if (cityGroupRef.current) cityGroupRef.current.visible = cityVisible;
     if (sceneGroupRef.current) sceneGroupRef.current.visible = mode === "scene";
+    if (modelGroupRef.current) modelGroupRef.current.visible = mode === "model" || walking;
     // Reframe camera (skip while walking — chase cam owns it)
     const cam = cameraRef.current; const ctrl = ctrlRef.current;
     if (cam && ctrl && !walking) {
       if (mode === "character") { cam.position.set(2.5, 1.8, 3.2); ctrl.target.set(0, 1, 0); }
       if (mode === "city")      { cam.position.set(18, 20, 22); ctrl.target.set(0, 0, 0); }
       if (mode === "scene")     { cam.position.set(12, 10, 14); ctrl.target.set(0, 1, 0); }
+      if (mode === "model")     { cam.position.set(3, 2.4, 4); ctrl.target.set(0, 0.6, 0); }
+
       ctrl.update();
     }
     // Disable orbit dragging while walking so WASD owns input
@@ -541,6 +589,98 @@ const Editor3D = () => {
     } finally { setAiBusy(false); }
   };
 
+  // ── From-scratch modeling ──────────────────────────────────
+  const ensureModelGroup = () => {
+    const scene = sceneRef.current!;
+    if (!modelGroupRef.current) {
+      const g = new THREE.Group(); g.name = "model";
+      scene.add(g); modelGroupRef.current = g;
+    }
+    return modelGroupRef.current;
+  };
+
+  const syncModelItems = () => {
+    const g = modelGroupRef.current;
+    setModelItems(g ? g.children.map((c) => ({ id: (c.userData as any).id, name: c.name })) : []);
+  };
+
+  const selectMesh = (mesh: THREE.Mesh | null) => {
+    selMeshRef.current = mesh;
+    setSelModelId(mesh ? (mesh.userData as any).id : null);
+    if (mesh) {
+      setMPos([mesh.position.x, mesh.position.y, mesh.position.z]);
+      setMRot([mesh.rotation.x, mesh.rotation.y, mesh.rotation.z]);
+      setMScale([mesh.scale.x, mesh.scale.y, mesh.scale.z]);
+      setMColor("#" + (mesh.material as THREE.MeshStandardMaterial).color.getHexString());
+    }
+  };
+
+  const addPrimitive = (p: Prim) => {
+    const g = ensureModelGroup();
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    const mesh = new THREE.Mesh(
+      makePrimGeometry(p),
+      new THREE.MeshStandardMaterial({ color: mColor, roughness: 0.6, metalness: 0.1, wireframe: mWire })
+    );
+    mesh.name = `${p}_${g.children.length + 1}`;
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    mesh.position.set(0, p === "plane" ? 0.01 : 0.5, 0);
+    if (p === "plane") mesh.rotation.x = -Math.PI / 2;
+    mesh.userData = { id, prim: p };
+    g.add(mesh); g.visible = true;
+    syncModelItems(); selectMesh(mesh);
+  };
+
+  const applyTransform = (
+    pos = mPos, rot = mRot, scl = mScale, color = mColor, wire = mWire
+  ) => {
+    const m = selMeshRef.current; if (!m) return;
+    m.position.set(pos[0], pos[1], pos[2]);
+    m.rotation.set(rot[0], rot[1], rot[2]);
+    m.scale.set(scl[0] || 0.01, scl[1] || 0.01, scl[2] || 0.01);
+    const mat = m.material as THREE.MeshStandardMaterial;
+    mat.color.set(color); mat.wireframe = wire;
+  };
+
+  const duplicateSelected = () => {
+    const m = selMeshRef.current; const g = modelGroupRef.current;
+    if (!m || !g) { toast.error("Select a part first"); return; }
+    const clone = m.clone();
+    clone.material = (m.material as THREE.MeshStandardMaterial).clone();
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    clone.name = `${m.name}_copy`;
+    clone.userData = { ...m.userData, id };
+    clone.position.x += 0.6;
+    g.add(clone); syncModelItems(); selectMesh(clone as THREE.Mesh);
+  };
+
+  const mirrorSelected = () => {
+    const m = selMeshRef.current; const g = modelGroupRef.current;
+    if (!m || !g) { toast.error("Select a part first"); return; }
+    const clone = m.clone();
+    clone.material = (m.material as THREE.MeshStandardMaterial).clone();
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    clone.name = `${m.name}_mirror`;
+    clone.userData = { ...m.userData, id };
+    clone.position.x = -m.position.x;
+    clone.scale.x = -m.scale.x;
+    g.add(clone); syncModelItems(); selectMesh(clone as THREE.Mesh);
+    toast.success("Mirrored on X");
+  };
+
+  const deleteSelected = () => {
+    const m = selMeshRef.current; const g = modelGroupRef.current;
+    if (!m || !g) return;
+    g.remove(m); m.geometry.dispose();
+    selectMesh(null); syncModelItems();
+  };
+
+  const clearModel = () => {
+    const g = modelGroupRef.current; if (!g) return;
+    [...g.children].forEach((c) => { g.remove(c); (c as THREE.Mesh).geometry?.dispose(); });
+    selectMesh(null); syncModelItems();
+  };
+
   // ── Export ─────────────────────────────────────────────────
   const exportGLB = () => {
     const scene = sceneRef.current; if (!scene) return;
@@ -548,7 +688,9 @@ const Editor3D = () => {
     if (charGroupRef.current?.visible) targets.push(charGroupRef.current);
     if (cityGroupRef.current?.visible) targets.push(cityGroupRef.current);
     if (sceneGroupRef.current?.visible) targets.push(sceneGroupRef.current);
+    if (modelGroupRef.current?.visible) targets.push(modelGroupRef.current);
     if (!targets.length && charGroupRef.current) targets.push(charGroupRef.current);
+
     const wrap = new THREE.Group();
     for (const t of targets) wrap.add(t.clone(true));
     const exp = new GLTFExporter();
@@ -594,8 +736,9 @@ const Editor3D = () => {
           </Button>
         </div>
         <div className="flex gap-1">
-          {(["character", "city", "scene"] as Mode[]).map((m) => {
-            const Icon = m === "character" ? User : m === "city" ? Building2 : Sparkles;
+          {(["model", "character", "city", "scene"] as Mode[]).map((m) => {
+            const Icon = m === "character" ? User : m === "city" ? Building2 : m === "model" ? BoxIcon : Sparkles;
+
             return (
               <Button key={m} size="sm" variant={mode === m ? "default" : "outline"}
                 className="h-7 text-[10px] flex-1" onClick={() => setMode(m)}
@@ -720,6 +863,107 @@ const Editor3D = () => {
               </Button>
             </>
           )}
+
+          {mode === "model" && (
+            <>
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Add primitive</div>
+                <div className="grid grid-cols-3 gap-1">
+                  {(["box", "sphere", "cylinder", "cone", "torus", "plane"] as Prim[]).map((p) => (
+                    <Button key={p} size="sm" variant={prim === p ? "default" : "outline"}
+                      className="h-7 text-[10px]"
+                      onClick={() => { setPrim(p); addPrimitive(p); }}>
+                      <Plus className="w-3 h-3 mr-1" />{p}
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">Click a part in the viewport to select it.</p>
+              </div>
+
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                  Parts ({modelItems.length})
+                </div>
+                <div className="space-y-1 max-h-28 overflow-auto">
+                  {modelItems.map((it) => (
+                    <button key={it.id}
+                      className={`w-full text-left px-2 py-1 rounded text-[10px] border ${
+                        selModelId === it.id ? "border-primary bg-primary/10 text-primary" : "border-border"
+                      }`}
+                      onClick={() => {
+                        const mesh = modelGroupRef.current?.children.find(
+                          (c) => (c.userData as any).id === it.id
+                        ) as THREE.Mesh | undefined;
+                        selectMesh(mesh ?? null);
+                      }}>
+                      {it.name}
+                    </button>
+                  ))}
+                  {!modelItems.length && (
+                    <p className="text-[10px] text-muted-foreground">No parts yet — add a primitive.</p>
+                  )}
+                </div>
+              </div>
+
+              {selModelId !== null && (
+                <div className="space-y-2 pt-2 border-t border-border">
+                  {([["Position", mPos, setMPos, -8, 8, 0.05], ["Rotation", mRot, setMRot, -3.14, 3.14, 0.02], ["Scale", mScale, setMScale, 0.05, 6, 0.05]] as const).map(
+                    ([label, val, set, min, max, step]) => (
+                      <div key={label}>
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{label}</div>
+                        {["X", "Y", "Z"].map((axis, i) => (
+                          <div key={axis} className="flex items-center gap-2 mb-1">
+                            <span className="w-3 text-[10px] text-muted-foreground">{axis}</span>
+                            <Slider min={min} max={max} step={step} value={[val[i]]}
+                              onValueChange={([v]) => {
+                                const next = [...val] as [number, number, number];
+                                next[i] = v;
+                                (set as any)(next);
+                                if (label === "Position") applyTransform(next, mRot, mScale);
+                                else if (label === "Rotation") applyTransform(mPos, next, mScale);
+                                else applyTransform(mPos, mRot, next);
+                              }}
+                              className="flex-1" />
+                            <span className="w-9 text-right text-[10px] text-muted-foreground">
+                              {val[i].toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-muted-foreground">Color</span>
+                    <input type="color" value={mColor}
+                      onChange={(e) => { setMColor(e.target.value); applyTransform(mPos, mRot, mScale, e.target.value); }}
+                      className="h-6 w-10 bg-transparent border border-border rounded" />
+                    <Button size="sm" variant={mWire ? "default" : "outline"} className="h-6 text-[10px] ml-auto"
+                      onClick={() => { const w = !mWire; setMWire(w); applyTransform(mPos, mRot, mScale, mColor, w); }}>
+                      Wireframe
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1">
+                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={duplicateSelected}>
+                      <Copy className="w-3 h-3 mr-1" />Dup
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={mirrorSelected}>
+                      <FlipHorizontal2 className="w-3 h-3 mr-1" />Mirror
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={deleteSelected}>
+                      <Trash2 className="w-3 h-3 mr-1" />Del
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <Button size="sm" variant="outline" className="w-full h-7 text-[10px]" onClick={clearModel}>
+                <RotateCcw className="w-3 h-3 mr-1" /> Clear model
+              </Button>
+            </>
+          )}
+
 
           {mode === "scene" && (
             <>
