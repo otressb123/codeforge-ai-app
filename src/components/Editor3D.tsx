@@ -588,6 +588,98 @@ const Editor3D = () => {
     } finally { setAiBusy(false); }
   };
 
+  // ── From-scratch modeling ──────────────────────────────────
+  const ensureModelGroup = () => {
+    const scene = sceneRef.current!;
+    if (!modelGroupRef.current) {
+      const g = new THREE.Group(); g.name = "model";
+      scene.add(g); modelGroupRef.current = g;
+    }
+    return modelGroupRef.current;
+  };
+
+  const syncModelItems = () => {
+    const g = modelGroupRef.current;
+    setModelItems(g ? g.children.map((c) => ({ id: (c.userData as any).id, name: c.name })) : []);
+  };
+
+  const selectMesh = (mesh: THREE.Mesh | null) => {
+    selMeshRef.current = mesh;
+    setSelModelId(mesh ? (mesh.userData as any).id : null);
+    if (mesh) {
+      setMPos([mesh.position.x, mesh.position.y, mesh.position.z]);
+      setMRot([mesh.rotation.x, mesh.rotation.y, mesh.rotation.z]);
+      setMScale([mesh.scale.x, mesh.scale.y, mesh.scale.z]);
+      setMColor("#" + (mesh.material as THREE.MeshStandardMaterial).color.getHexString());
+    }
+  };
+
+  const addPrimitive = (p: Prim) => {
+    const g = ensureModelGroup();
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    const mesh = new THREE.Mesh(
+      makePrimGeometry(p),
+      new THREE.MeshStandardMaterial({ color: mColor, roughness: 0.6, metalness: 0.1, wireframe: mWire })
+    );
+    mesh.name = `${p}_${g.children.length + 1}`;
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    mesh.position.set(0, p === "plane" ? 0.01 : 0.5, 0);
+    if (p === "plane") mesh.rotation.x = -Math.PI / 2;
+    mesh.userData = { id, prim: p };
+    g.add(mesh); g.visible = true;
+    syncModelItems(); selectMesh(mesh);
+  };
+
+  const applyTransform = (
+    pos = mPos, rot = mRot, scl = mScale, color = mColor, wire = mWire
+  ) => {
+    const m = selMeshRef.current; if (!m) return;
+    m.position.set(pos[0], pos[1], pos[2]);
+    m.rotation.set(rot[0], rot[1], rot[2]);
+    m.scale.set(scl[0] || 0.01, scl[1] || 0.01, scl[2] || 0.01);
+    const mat = m.material as THREE.MeshStandardMaterial;
+    mat.color.set(color); mat.wireframe = wire;
+  };
+
+  const duplicateSelected = () => {
+    const m = selMeshRef.current; const g = modelGroupRef.current;
+    if (!m || !g) { toast.error("Select a part first"); return; }
+    const clone = m.clone();
+    clone.material = (m.material as THREE.MeshStandardMaterial).clone();
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    clone.name = `${m.name}_copy`;
+    clone.userData = { ...m.userData, id };
+    clone.position.x += 0.6;
+    g.add(clone); syncModelItems(); selectMesh(clone as THREE.Mesh);
+  };
+
+  const mirrorSelected = () => {
+    const m = selMeshRef.current; const g = modelGroupRef.current;
+    if (!m || !g) { toast.error("Select a part first"); return; }
+    const clone = m.clone();
+    clone.material = (m.material as THREE.MeshStandardMaterial).clone();
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    clone.name = `${m.name}_mirror`;
+    clone.userData = { ...m.userData, id };
+    clone.position.x = -m.position.x;
+    clone.scale.x = -m.scale.x;
+    g.add(clone); syncModelItems(); selectMesh(clone as THREE.Mesh);
+    toast.success("Mirrored on X");
+  };
+
+  const deleteSelected = () => {
+    const m = selMeshRef.current; const g = modelGroupRef.current;
+    if (!m || !g) return;
+    g.remove(m); m.geometry.dispose();
+    selectMesh(null); syncModelItems();
+  };
+
+  const clearModel = () => {
+    const g = modelGroupRef.current; if (!g) return;
+    [...g.children].forEach((c) => { g.remove(c); (c as THREE.Mesh).geometry?.dispose(); });
+    selectMesh(null); syncModelItems();
+  };
+
   // ── Export ─────────────────────────────────────────────────
   const exportGLB = () => {
     const scene = sceneRef.current; if (!scene) return;
@@ -595,7 +687,9 @@ const Editor3D = () => {
     if (charGroupRef.current?.visible) targets.push(charGroupRef.current);
     if (cityGroupRef.current?.visible) targets.push(cityGroupRef.current);
     if (sceneGroupRef.current?.visible) targets.push(sceneGroupRef.current);
+    if (modelGroupRef.current?.visible) targets.push(modelGroupRef.current);
     if (!targets.length && charGroupRef.current) targets.push(charGroupRef.current);
+
     const wrap = new THREE.Group();
     for (const t of targets) wrap.add(t.clone(true));
     const exp = new GLTFExporter();
