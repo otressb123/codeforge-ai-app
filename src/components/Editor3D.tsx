@@ -735,8 +735,9 @@ const Editor3D = () => {
           </Button>
         </div>
         <div className="flex gap-1">
-          {(["character", "city", "scene"] as Mode[]).map((m) => {
-            const Icon = m === "character" ? User : m === "city" ? Building2 : Sparkles;
+          {(["model", "character", "city", "scene"] as Mode[]).map((m) => {
+            const Icon = m === "character" ? User : m === "city" ? Building2 : m === "model" ? BoxIcon : Sparkles;
+
             return (
               <Button key={m} size="sm" variant={mode === m ? "default" : "outline"}
                 className="h-7 text-[10px] flex-1" onClick={() => setMode(m)}
