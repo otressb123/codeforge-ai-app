@@ -16,9 +16,23 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 
-type Mode = "scene" | "character" | "city";
+type Mode = "scene" | "character" | "city" | "model";
 type Anim = "idle" | "walk" | "run" | "wave" | "none";
 type Tool = "building" | "road" | "tree" | "water" | "car" | "erase";
+
+// ─── From-scratch modeling primitives ───────────────────────────
+type Prim = "box" | "sphere" | "cylinder" | "cone" | "torus" | "plane";
+const makePrimGeometry = (p: Prim): THREE.BufferGeometry => {
+  switch (p) {
+    case "sphere": return new THREE.SphereGeometry(0.5, 24, 16);
+    case "cylinder": return new THREE.CylinderGeometry(0.4, 0.4, 1, 24);
+    case "cone": return new THREE.ConeGeometry(0.5, 1, 24);
+    case "torus": return new THREE.TorusGeometry(0.4, 0.15, 16, 32);
+    case "plane": return new THREE.PlaneGeometry(1, 1);
+    default: return new THREE.BoxGeometry(1, 1, 1);
+  }
+};
+
 
 // ─── City config ────────────────────────────────────────────────
 const GRID = 24;
