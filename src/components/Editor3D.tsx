@@ -863,6 +863,107 @@ const Editor3D = () => {
             </>
           )}
 
+          {mode === "model" && (
+            <>
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Add primitive</div>
+                <div className="grid grid-cols-3 gap-1">
+                  {(["box", "sphere", "cylinder", "cone", "torus", "plane"] as Prim[]).map((p) => (
+                    <Button key={p} size="sm" variant={prim === p ? "default" : "outline"}
+                      className="h-7 text-[10px]"
+                      onClick={() => { setPrim(p); addPrimitive(p); }}>
+                      <Plus className="w-3 h-3 mr-1" />{p}
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">Click a part in the viewport to select it.</p>
+              </div>
+
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                  Parts ({modelItems.length})
+                </div>
+                <div className="space-y-1 max-h-28 overflow-auto">
+                  {modelItems.map((it) => (
+                    <button key={it.id}
+                      className={`w-full text-left px-2 py-1 rounded text-[10px] border ${
+                        selModelId === it.id ? "border-primary bg-primary/10 text-primary" : "border-border"
+                      }`}
+                      onClick={() => {
+                        const mesh = modelGroupRef.current?.children.find(
+                          (c) => (c.userData as any).id === it.id
+                        ) as THREE.Mesh | undefined;
+                        selectMesh(mesh ?? null);
+                      }}>
+                      {it.name}
+                    </button>
+                  ))}
+                  {!modelItems.length && (
+                    <p className="text-[10px] text-muted-foreground">No parts yet — add a primitive.</p>
+                  )}
+                </div>
+              </div>
+
+              {selModelId !== null && (
+                <div className="space-y-2 pt-2 border-t border-border">
+                  {([["Position", mPos, setMPos, -8, 8, 0.05], ["Rotation", mRot, setMRot, -3.14, 3.14, 0.02], ["Scale", mScale, setMScale, 0.05, 6, 0.05]] as const).map(
+                    ([label, val, set, min, max, step]) => (
+                      <div key={label}>
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{label}</div>
+                        {["X", "Y", "Z"].map((axis, i) => (
+                          <div key={axis} className="flex items-center gap-2 mb-1">
+                            <span className="w-3 text-[10px] text-muted-foreground">{axis}</span>
+                            <Slider min={min} max={max} step={step} value={[val[i]]}
+                              onValueChange={([v]) => {
+                                const next = [...val] as [number, number, number];
+                                next[i] = v;
+                                (set as any)(next);
+                                if (label === "Position") applyTransform(next, mRot, mScale);
+                                else if (label === "Rotation") applyTransform(mPos, next, mScale);
+                                else applyTransform(mPos, mRot, next);
+                              }}
+                              className="flex-1" />
+                            <span className="w-9 text-right text-[10px] text-muted-foreground">
+                              {val[i].toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-muted-foreground">Color</span>
+                    <input type="color" value={mColor}
+                      onChange={(e) => { setMColor(e.target.value); applyTransform(mPos, mRot, mScale, e.target.value); }}
+                      className="h-6 w-10 bg-transparent border border-border rounded" />
+                    <Button size="sm" variant={mWire ? "default" : "outline"} className="h-6 text-[10px] ml-auto"
+                      onClick={() => { const w = !mWire; setMWire(w); applyTransform(mPos, mRot, mScale, mColor, w); }}>
+                      Wireframe
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1">
+                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={duplicateSelected}>
+                      <Copy className="w-3 h-3 mr-1" />Dup
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={mirrorSelected}>
+                      <FlipHorizontal2 className="w-3 h-3 mr-1" />Mirror
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={deleteSelected}>
+                      <Trash2 className="w-3 h-3 mr-1" />Del
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <Button size="sm" variant="outline" className="w-full h-7 text-[10px]" onClick={clearModel}>
+                <RotateCcw className="w-3 h-3 mr-1" /> Clear model
+              </Button>
+            </>
+          )}
+
+
           {mode === "scene" && (
             <>
               <div>
