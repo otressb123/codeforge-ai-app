@@ -28,6 +28,7 @@ import ExportImportDialog from "@/components/ExportImportDialog";
 import CollabPanel from "@/components/CollabPanel";
 import Editor3D from "@/components/Editor3D";
 import ImageStudioPanel from "@/components/ImageStudioPanel";
+import PythonPanel from "@/components/PythonPanel";
 import TemplateGallery from "@/components/TemplateGallery";
 import CommandPalette from "@/components/CommandPalette";
 import StatusBar from "@/components/StatusBar";
@@ -35,7 +36,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
-type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "editor3d" | "imagestudio" | "templates";
+type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "editor3d" | "imagestudio" | "templates" | "python";
 
 interface OpenFile {
   path: string;
@@ -671,6 +672,18 @@ const IDE = () => {
         return <Editor3D />;
       case "imagestudio":
         return <ImageStudioPanel />;
+      case "python": {
+        const pyFiles: { path: string; content: string }[] = [];
+        const walkPy = (nodes: FileNode[], base = "") => {
+          for (const n of nodes) {
+            const p = `${base}/${n.name}`;
+            if (n.type === "file" && n.name.endsWith(".py")) pyFiles.push({ path: p, content: n.content || "" });
+            if (n.children) walkPy(n.children, p);
+          }
+        };
+        walkPy(files);
+        return <PythonPanel pyFiles={pyFiles} />;
+      }
       case "templates":
         return <TemplateGallery onLoad={(name, tplFiles) => { pushSnapshot("Pre-template", files); handleNewProject(name, tplFiles); setPreviewKey(p => p + 1); }} />;
       case "settings":
