@@ -1,7 +1,7 @@
-import { Files, Bot, Terminal, Settings, Search, Puzzle, GitBranch, Layers, FileText, Image, History, Brain, Users, Box, Wand2, Sparkles } from "lucide-react";
+import { Files, Bot, Terminal, Settings, Search, Puzzle, GitBranch, Layers, FileText, Image, History, Brain, Users, Box, Wand2, Sparkles, FileCode2 } from "lucide-react";
 import { motion } from "framer-motion";
 
-type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "editor3d" | "imagestudio" | "templates";
+type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "editor3d" | "imagestudio" | "templates" | "python";
 
 interface ActivityBarProps {
   activeTab: SidebarTab;
@@ -16,6 +16,7 @@ const ActivityBar = ({ activeTab, onTabChange }: ActivityBarProps) => {
     { id: "templates" as SidebarTab, icon: Sparkles, label: "Template Gallery" },
     { id: "imagestudio" as SidebarTab, icon: Wand2, label: "Image Studio" },
     { id: "editor3d" as SidebarTab, icon: Box, label: "3D Editor (Scene · Character · City)" },
+    { id: "python" as SidebarTab, icon: FileCode2, label: "Python (offline WASM)" },
     { id: "memory" as SidebarTab, icon: Brain, label: "Project Memory" },
     { id: "history" as SidebarTab, icon: History, label: "Version History" },
     { id: "components" as SidebarTab, icon: Layers, label: "Components" },
