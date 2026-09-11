@@ -18,7 +18,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 
 type Mode = "scene" | "character" | "city" | "model";
-type Anim = "idle" | "walk" | "run" | "wave" | "none";
+type Anim = "idle" | "walk" | "run" | "wave" | "custom" | "none";
+
+// A keyframe = a full snapshot of every bone rotation at a point in time.
+interface KeyFrame { t: number; pose: Record<string, [number, number, number]> }
 type Tool = "building" | "road" | "tree" | "water" | "car" | "erase";
 
 // ─── From-scratch modeling primitives ───────────────────────────
@@ -59,10 +62,12 @@ interface Rig {
 }
 
 const CHAR_PRESETS = {
-  hero:  { skin: "#f4c9a0", hair: "#3b2417", shirt: "#3b82f6", pants: "#1f2937", height: 1.0 },
-  anime: { skin: "#ffe4c4", hair: "#ec4899", shirt: "#ffffff", pants: "#0f172a", height: 0.95 },
-  ninja: { skin: "#d4a373", hair: "#000000", shirt: "#111827", pants: "#111827", height: 1.0 },
-  robot: { skin: "#94a3b8", hair: "#22d3ee", shirt: "#64748b", pants: "#334155", height: 1.05 },
+  hero:   { skin: "#f4c9a0", hair: "#3b2417", shirt: "#3b82f6", pants: "#1f2937", height: 1.0,  style: "human" as const, eye: "#1d4ed8" },
+  anime:  { skin: "#ffe9d6", hair: "#ec4899", shirt: "#ffffff", pants: "#0f172a", height: 0.95, style: "anime" as const, eye: "#7c3aed" },
+  dongua: { skin: "#ffeede", hair: "#111827", shirt: "#b91c1c", pants: "#0f172a", height: 0.98, style: "anime" as const, eye: "#0ea5e9" },
+  chibi:  { skin: "#ffe4c4", hair: "#f59e0b", shirt: "#22d3ee", pants: "#1e293b", height: 0.8,  style: "anime" as const, eye: "#0f172a" },
+  ninja:  { skin: "#d4a373", hair: "#000000", shirt: "#111827", pants: "#111827", height: 1.0,  style: "human" as const, eye: "#111827" },
+  robot:  { skin: "#94a3b8", hair: "#22d3ee", shirt: "#64748b", pants: "#334155", height: 1.05, style: "robot" as const, eye: "#22d3ee" },
 };
 type Preset = keyof typeof CHAR_PRESETS;
 
@@ -98,23 +103,70 @@ function buildCharacter(preset: Preset, opts: { height: number; head: number }):
 
   meshAt("pelvis", new THREE.BoxGeometry(0.35 * H, 0.2 * H, 0.22 * H), pants, hips, [0, 0, 0]);
   meshAt("torso", new THREE.BoxGeometry(0.44 * H, 0.35 * H, 0.24 * H), shirt, spine, [0, 0.08 * H, 0]);
-  meshAt("head", new THREE.SphereGeometry(0.13 * H * opts.head, 16, 16), skin, head, [0, 0.13 * H, 0]);
+  const anime = p.style === "anime";
+  const headMul = opts.head * (anime ? 1.32 : 1);
+  const hr = 0.13 * H * headMul;
+  const headMesh = meshAt("head", new THREE.SphereGeometry(hr, 24, 20), skin, head, [0, 0.13 * H, 0]);
+  if (anime) headMesh.scale.set(1, 1.06, 0.92); // slightly tapered anime skull
+
   // hair cap
-  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.135 * H * opts.head, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2), hair);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(hr * 1.06, 24, 20, 0, Math.PI * 2, 0, Math.PI / 2), hair);
   cap.position.set(0, 0.13 * H, 0); head.add(cap);
-  // eyes
-  for (const sx of [-1, 1]) {
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.02 * H, 8, 8), new THREE.MeshBasicMaterial({ color: 0x0f172a }));
-    eye.position.set(sx * 0.045 * H, 0.13 * H, 0.11 * H * opts.head); head.add(eye);
+
+  if (anime) {
+    // spiky anime hair — fringe spikes around the crown
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2;
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(hr * 0.3, hr * (0.9 + (i % 3) * 0.35), 5), hair);
+      spike.position.set(Math.cos(a) * hr * 0.72, 0.13 * H + hr * 0.55, Math.sin(a) * hr * 0.72);
+      spike.rotation.set(Math.cos(a) * 0.7, 0, -Math.sin(a) * 0.7);
+      head.add(spike);
+    }
+    // long side locks
+    for (const sx of [-1, 1]) {
+      const lock = new THREE.Mesh(new THREE.BoxGeometry(hr * 0.28, hr * 1.7, hr * 0.4), hair);
+      lock.position.set(sx * hr * 0.9, 0.13 * H - hr * 0.55, hr * 0.12);
+      lock.rotation.z = sx * 0.12; head.add(lock);
+    }
+    // big anime eyes: white almond + colored iris + specular highlight + brow
+    const white = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const iris = new THREE.MeshBasicMaterial({ color: new THREE.Color(p.eye) });
+    const pupil = new THREE.MeshBasicMaterial({ color: 0x0b1020 });
+    const shine = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    for (const sx of [-1, 1]) {
+      const w = new THREE.Mesh(new THREE.SphereGeometry(hr * 0.3, 16, 16), white);
+      w.scale.set(1, 1.35, 0.45);
+      w.position.set(sx * hr * 0.36, 0.13 * H + hr * 0.02, hr * 0.86); head.add(w);
+      const ir = new THREE.Mesh(new THREE.SphereGeometry(hr * 0.2, 16, 16), iris);
+      ir.scale.set(1, 1.3, 0.35);
+      ir.position.set(sx * hr * 0.36, 0.13 * H, hr * 0.99); head.add(ir);
+      const pu = new THREE.Mesh(new THREE.SphereGeometry(hr * 0.09, 12, 12), pupil);
+      pu.scale.set(1, 1.4, 0.3);
+      pu.position.set(sx * hr * 0.36, 0.13 * H, hr * 1.04); head.add(pu);
+      const hi = new THREE.Mesh(new THREE.SphereGeometry(hr * 0.055, 8, 8), shine);
+      hi.position.set(sx * hr * 0.3, 0.13 * H + hr * 0.12, hr * 1.05); head.add(hi);
+      const brow = new THREE.Mesh(new THREE.BoxGeometry(hr * 0.36, hr * 0.06, hr * 0.08), hair);
+      brow.position.set(sx * hr * 0.36, 0.13 * H + hr * 0.42, hr * 0.9);
+      brow.rotation.z = sx * -0.18; head.add(brow);
+    }
+    // small mouth
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(hr * 0.16, hr * 0.05, hr * 0.05), new THREE.MeshBasicMaterial({ color: 0xb45309 }));
+    mouth.position.set(0, 0.13 * H - hr * 0.5, hr * 0.92); head.add(mouth);
+  } else {
+    for (const sx of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.02 * H, 8, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(p.eye) }));
+      eye.position.set(sx * 0.045 * H, 0.13 * H, 0.11 * H * headMul); head.add(eye);
+    }
   }
+  const limb = anime ? 0.78 : 1; // anime silhouettes have slimmer limbs
 
   // Arms
   for (const side of ["L", "R"] as const) {
     const sx = side === "L" ? 1 : -1;
     const shoulder = bone(`${side}_shoulder`, spine, [sx * 0.24 * H, 0.22 * H, 0]);
-    meshAt(`${side}_upperArm`, new THREE.CylinderGeometry(0.05 * H, 0.05 * H, 0.28 * H, 8), skin, shoulder, [0, -0.14 * H, 0]);
+    meshAt(`${side}_upperArm`, new THREE.CylinderGeometry(0.05 * H * limb, 0.05 * H * limb, 0.28 * H, 8), skin, shoulder, [0, -0.14 * H, 0]);
     const elbow = bone(`${side}_elbow`, shoulder, [0, -0.28 * H, 0]);
-    meshAt(`${side}_forearm`, new THREE.CylinderGeometry(0.045 * H, 0.045 * H, 0.26 * H, 8), skin, elbow, [0, -0.13 * H, 0]);
+    meshAt(`${side}_forearm`, new THREE.CylinderGeometry(0.045 * H * limb, 0.045 * H * limb, 0.26 * H, 8), skin, elbow, [0, -0.13 * H, 0]);
     const wrist = bone(`${side}_wrist`, elbow, [0, -0.26 * H, 0]);
     meshAt(`${side}_hand`, new THREE.SphereGeometry(0.055 * H, 8, 8), skin, wrist, [0, -0.03 * H, 0]);
   }
@@ -123,9 +175,9 @@ function buildCharacter(preset: Preset, opts: { height: number; head: number }):
   for (const side of ["L", "R"] as const) {
     const sx = side === "L" ? 1 : -1;
     const hip = bone(`${side}_hip`, hips, [sx * 0.1 * H, -0.05 * H, 0]);
-    meshAt(`${side}_thigh`, new THREE.CylinderGeometry(0.065 * H, 0.06 * H, 0.35 * H, 8), pants, hip, [0, -0.18 * H, 0]);
+    meshAt(`${side}_thigh`, new THREE.CylinderGeometry(0.065 * H * limb, 0.06 * H * limb, 0.35 * H, 8), pants, hip, [0, -0.18 * H, 0]);
     const knee = bone(`${side}_knee`, hip, [0, -0.35 * H, 0]);
-    meshAt(`${side}_shin`, new THREE.CylinderGeometry(0.055 * H, 0.05 * H, 0.32 * H, 8), skin, knee, [0, -0.16 * H, 0]);
+    meshAt(`${side}_shin`, new THREE.CylinderGeometry(0.055 * H * limb, 0.05 * H * limb, 0.32 * H, 8), skin, knee, [0, -0.16 * H, 0]);
     const ankle = bone(`${side}_ankle`, knee, [0, -0.32 * H, 0]);
     meshAt(`${side}_foot`, new THREE.BoxGeometry(0.09 * H, 0.05 * H, 0.16 * H), pants, ankle, [0, -0.025 * H, 0.03 * H]);
   }
@@ -133,13 +185,42 @@ function buildCharacter(preset: Preset, opts: { height: number; head: number }):
   return { root, bones, parts, rest };
 }
 
-function animateRig(rig: Rig, anim: Anim, t: number) {
+function sampleClip(rig: Rig, clip: KeyFrame[], time: number) {
+  const frames = [...clip].sort((a, b) => a.t - b.t);
+  const len = frames[frames.length - 1].t || 0.001;
+  const tt = time % len;
+  let a = frames[0], b = frames[frames.length - 1];
+  for (let i = 0; i < frames.length - 1; i++) {
+    if (tt >= frames[i].t && tt <= frames[i + 1].t) { a = frames[i]; b = frames[i + 1]; break; }
+  }
+  const span = Math.max(0.0001, b.t - a.t);
+  const k = Math.min(1, Math.max(0, (tt - a.t) / span));
+  for (const name in rig.bones) {
+    const ra = a.pose[name] ?? [0, 0, 0];
+    const rb = b.pose[name] ?? ra;
+    rig.bones[name].rotation.set(
+      ra[0] + (rb[0] - ra[0]) * k,
+      ra[1] + (rb[1] - ra[1]) * k,
+      ra[2] + (rb[2] - ra[2]) * k,
+    );
+  }
+}
+
+function animateRig(rig: Rig, anim: Anim, t: number, clip: KeyFrame[] = []) {
   const b = rig.bones;
   // reset to rest each frame for cleanliness
   for (const k in b) b[k].rotation.copy(rig.rest[k]);
   rig.root.position.y = 0;
 
-  if (anim === "idle") {
+  if (anim === "custom") {
+    if (clip.length >= 2) sampleClip(rig, clip, t);
+    else if (clip.length === 1) {
+      for (const name in rig.bones) {
+        const r = clip[0].pose[name] ?? [0, 0, 0];
+        rig.bones[name].rotation.set(r[0], r[1], r[2]);
+      }
+    }
+  } else if (anim === "idle") {
     const s = Math.sin(t * 2) * 0.05;
     b.spine.rotation.x = s;
     b.head.rotation.y = Math.sin(t * 0.8) * 0.15;
@@ -447,7 +528,7 @@ const Editor3D = () => {
         ctrl.target.lerp(new THREE.Vector3(root.position.x, root.position.y + 1.2, root.position.z), 0.2);
       }
 
-      if (rigRef.current && animRef.current !== "none") animateRig(rigRef.current, animRef.current, t);
+      if (rigRef.current && animRef.current !== "none") animateRig(rigRef.current, animRef.current, t, clipRef.current);
       ctrl.update();
       renderer.render(scene, cam);
       raf = requestAnimationFrame(tick);
