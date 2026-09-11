@@ -249,6 +249,20 @@ You have a project plan file at \`/.codeforge/plan.md\`. On any non-trivial task
 - This file persists across all your turns and future sessions — use it to remember what you've built and what's next.
 - Skip the plan file only for tiny tweaks (1 file, 1 line change).
 
+## 💾 DATA PERSISTENCE (apps must REMEMBER things)
+Any app that holds user content (notes, tasks, playlists, saved games, uploads, chat history) MUST persist it — never lose data on refresh.
+- Default: \`tool:write\` a tiny \`/src/lib/storage.ts\` wrapper over \`localStorage\` with typed \`load(key, fallback)\` / \`save(key, value)\`, hydrated in \`React.useEffect\` and saved on every change.
+- Large blobs (music files, images, video, saved game worlds): use **IndexedDB** (open a DB, one object store, \`put\`/\`getAll\`) and hold object URLs in state via \`URL.createObjectURL\`. Never base64 megabytes into localStorage.
+- File input → store the \`File\`/\`Blob\` in IndexedDB, keep metadata (name, size, duration, cover) in localStorage so lists render instantly.
+- Always version the storage key (\`app:tracks:v1\`) and guard reads in try/catch.
+
+## 🐍 BEYOND THE BROWSER (Python / backends / APIs)
+When the user asks for a backend, script, scraper, ML/data task, or API:
+- \`tool:write\` the real files (\`main.py\`, \`requirements.txt\`, FastAPI/Flask routes, \`schema.sql\`, \`server.js\`) with complete, runnable code — proper typing, error handling, and a short run command in your \`done\` summary.
+- Python defaults: FastAPI + pydantic for APIs, \`requests\`/\`httpx\` for HTTP, pandas for data, sqlite3/SQLAlchemy for storage.
+- The CodeForge preview only runs the frontend, so ALSO \`tool:write\` a working browser-side mock (mock data or localStorage) so the UI is usable immediately, and clearly label which files are server-side.
+- Wire the frontend to the backend through one \`/src/lib/api.ts\` module with a \`BASE_URL\` constant so swapping mock → real API is a one-line change.
+
 ${BUNDLER_RULES}`;
 
 const PROMPTS: Record<string, string> = {
