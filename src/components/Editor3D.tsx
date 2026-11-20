@@ -266,6 +266,10 @@ const Editor3D = () => {
   const animRef = useRef<Anim>("idle");
   const posePartRef = useRef<string | null>(null);
   const clipRef = useRef<KeyFrame[]>([]);
+  // Scene director: extra actors + camera shot keys
+  const actorsRef = useRef<{ rig: Rig; group: THREE.Group; anim: Anim; clip: KeyFrame[] }[]>([]);
+  const camKeysRef = useRef<{ t: number; pos: number[]; target: number[] }[]>([]);
+  const cineStartRef = useRef<number | null>(null);
 
   const [mode, setMode] = useState<Mode>("character");
   // Modeling state
@@ -291,6 +295,11 @@ const Editor3D = () => {
   const [clip, setClip] = useState<KeyFrame[]>([]);
   const [keyT, setKeyT] = useState(0);
   clipRef.current = clip;
+  const [actorCount, setActorCount] = useState(0);
+  const [camKeys, setCamKeys] = useState<{ t: number; pos: number[]; target: number[] }[]>([]);
+  const [shotT, setShotT] = useState(0);
+  const [filming, setFilming] = useState(false);
+  camKeysRef.current = camKeys;
   // City state
   const [tool, setTool] = useState<Tool>("building");
   const [bh, setBh] = useState(3);
@@ -533,6 +542,23 @@ const Editor3D = () => {
       }
 
       if (rigRef.current && animRef.current !== "none") animateRig(rigRef.current, animRef.current, t, clipRef.current);
+      for (const a of actorsRef.current) animateRig(a.rig, a.anim, t, a.clip);
+      // Cinematic camera: interpolate between shot keys
+      const ck = camKeysRef.current;
+      if (cineStartRef.current !== null && ck.length >= 2) {
+        const keys = [...ck].sort((x, y) => x.t - y.t);
+        const st = t - cineStartRef.current;
+        const end = keys[keys.length - 1].t;
+        if (st > end) { cineStartRef.current = null; window.dispatchEvent(new Event("cf-cine-end")); }
+        else {
+          let a = keys[0], b = keys[1];
+          for (let i = 0; i < keys.length - 1; i++) if (st >= keys[i].t && st <= keys[i + 1].t) { a = keys[i]; b = keys[i + 1]; break; }
+          const raw = Math.min(1, Math.max(0, (st - a.t) / Math.max(0.001, b.t - a.t)));
+          const k = raw * raw * (3 - 2 * raw); // smooth ease
+          cam.position.set(...(a.pos.map((v, i) => v + (b.pos[i] - v) * k) as [number, number, number]));
+          ctrl.target.set(...(a.target.map((v, i) => v + (b.target[i] - v) * k) as [number, number, number]));
+        }
+      }
       ctrl.update();
       renderer.render(scene, cam);
       raf = requestAnimationFrame(tick);
@@ -576,6 +602,7 @@ const Editor3D = () => {
     const charVisible = mode === "character" || walking;
     const cityVisible = mode === "city" || walking;
     if (charGroupRef.current) charGroupRef.current.visible = charVisible;
+    for (const a of actorsRef.current) a.group.visible = charVisible;
     if (cityGroupRef.current) cityGroupRef.current.visible = cityVisible;
     if (sceneGroupRef.current) sceneGroupRef.current.visible = mode === "scene";
     if (modelGroupRef.current) modelGroupRef.current.visible = mode === "model" || walking;
@@ -805,6 +832,41 @@ const Editor3D = () => {
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "animation.json"; a.click();
   };
 
+  // ── Scene director ─────────────────────────────────────────
+  useEffect(() => {
+    const end = () => { setFilming(false); if (ctrlRef.current) ctrlRef.current.enabled = true; };
+    window.addEventListener("cf-cine-end", end);
+    return () => window.removeEventListener("cf-cine-end", end);
+  }, []);
+  const addActor = () => {
+    const scene = sceneRef.current; if (!scene) return;
+    const rig = buildCharacter(preset, { height, head: headScale });
+    const group = new THREE.Group(); group.name = `actor_${actorsRef.current.length + 1}`; group.add(rig.root);
+    const n = actorsRef.current.length + 1;
+    group.position.set((n % 2 ? 1 : -1) * Math.ceil(n / 2) * 1.2, 0, -0.4 * Math.ceil(n / 2));
+    group.rotation.y = (n % 2 ? -1 : 1) * 0.35;
+    scene.add(group);
+    actorsRef.current.push({ rig, group, anim: playing ? anim : "idle", clip: [...clip] });
+    setActorCount(actorsRef.current.length);
+    toast.success(`Added ${preset} actor doing "${playing ? anim : "idle"}"`);
+  };
+  const clearActors = () => {
+    for (const a of actorsRef.current) a.group.parent?.remove(a.group);
+    actorsRef.current = []; setActorCount(0);
+  };
+  const addShot = () => {
+    const cam = cameraRef.current, ctrl = ctrlRef.current; if (!cam || !ctrl) return;
+    setCamKeys((k) => [...k.filter((x) => Math.abs(x.t - shotT) > 0.01), { t: shotT, pos: cam.position.toArray(), target: ctrl.target.toArray() }].sort((a, b) => a.t - b.t));
+    toast.success(`Camera shot at ${shotT.toFixed(1)}s`);
+    setShotT((t) => Math.round((t + 2) * 10) / 10);
+  };
+  const playScene = () => {
+    if (camKeys.length < 2) { toast.error("Add at least 2 camera shots"); return; }
+    if (ctrlRef.current) ctrlRef.current.enabled = false;
+    cineStartRef.current = clockRef.current.getElapsedTime();
+    setFilming(true); setPlaying(true);
+  };
+
   // ── Offline project save/load (stays on this device) ──────
   const PROJECT_KEY = "codeforge.3d.project.v1";
   const saveProject = () => {
@@ -814,7 +876,7 @@ const Editor3D = () => {
         pos: m.position.toArray(), rot: [m.rotation.x, m.rotation.y, m.rotation.z], scale: m.scale.toArray(),
         color: "#" + (m.material as THREE.MeshStandardMaterial).color.getHexString() };
     });
-    localStorage.setItem(PROJECT_KEY, JSON.stringify({ preset, height, headScale, clip, city: [...cityMapRef.current.entries()], model }));
+    localStorage.setItem(PROJECT_KEY, JSON.stringify({ preset, height, headScale, clip, camKeys, city: [...cityMapRef.current.entries()], model }));
     toast.success("Project saved on this device");
   };
   const loadProject = () => {
@@ -822,7 +884,7 @@ const Editor3D = () => {
     if (!raw) { toast.error("No saved project yet"); return; }
     try {
       const d = JSON.parse(raw);
-      setPreset(d.preset); setHeight(d.height); setHeadScale(d.headScale); setClip(d.clip || []);
+      setPreset(d.preset); setHeight(d.height); setHeadScale(d.headScale); setClip(d.clip || []); setCamKeys(d.camKeys || []);
       cityMapRef.current = new Map(d.city || []); rebuildCity();
       clearModel(); const g = ensureModelGroup();
       for (const it of d.model || []) {
@@ -947,6 +1009,21 @@ const Editor3D = () => {
                   ))}
                 </div>
               )}
+              <div className="pt-2 border-t border-border space-y-1">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Scene director · {actorCount} extra actors · {camKeys.length} shots</div>
+                <div className="text-[10px] text-muted-foreground">Add actors (uses the current style + animation). Move the camera, add a shot, repeat, then play the scene.</div>
+                <div className="grid grid-cols-2 gap-1">
+                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={addActor}><User className="w-3 h-3 mr-1" />Add actor</Button>
+                  <Button size="sm" variant="outline" className="h-7 text-[10px]" disabled={!actorCount} onClick={clearActors}><Trash2 className="w-3 h-3 mr-1" />Remove actors</Button>
+                </div>
+                <div className="flex justify-between text-[10px]"><span>Shot time</span><span className="text-muted-foreground">{shotT.toFixed(1)}s</span></div>
+                <Slider min={0} max={30} step={0.5} value={[shotT]} onValueChange={(v) => setShotT(v[0])} />
+                <div className="grid grid-cols-3 gap-1">
+                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={addShot}><Plus className="w-3 h-3 mr-1" />Shot</Button>
+                  <Button size="sm" variant={filming ? "default" : "outline"} className="h-7 text-[10px]" disabled={camKeys.length < 2 || filming} onClick={playScene}><Play className="w-3 h-3 mr-1" />Play</Button>
+                  <Button size="sm" variant="outline" className="h-7 text-[10px]" disabled={!camKeys.length} onClick={() => { setCamKeys([]); setShotT(0); }}><Trash2 className="w-3 h-3" /></Button>
+                </div>
+              </div>
               <div className="pt-2 border-t border-border space-y-1">
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Animation studio · {clip.length} keys</div>
                 <div className="text-[10px] text-muted-foreground">Pause, pose the body, then add a key. Repeat at later times, then play.</div>
