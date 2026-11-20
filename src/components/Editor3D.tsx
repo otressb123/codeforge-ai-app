@@ -265,6 +265,7 @@ const Editor3D = () => {
   const paintingRef = useRef(false);
   const animRef = useRef<Anim>("idle");
   const posePartRef = useRef<string | null>(null);
+  const clipRef = useRef<KeyFrame[]>([]);
 
   const [mode, setMode] = useState<Mode>("character");
   // Modeling state
@@ -287,6 +288,9 @@ const Editor3D = () => {
   const [playing, setPlaying] = useState(true);
   const [selectedPart, setSelectedPart] = useState<string | null>(null);
   const [poseRot, setPoseRot] = useState<[number, number, number]>([0, 0, 0]);
+  const [clip, setClip] = useState<KeyFrame[]>([]);
+  const [keyT, setKeyT] = useState(0);
+  clipRef.current = clip;
   // City state
   const [tool, setTool] = useState<Tool>("building");
   const [bh, setBh] = useState(3);
@@ -787,6 +791,50 @@ const Editor3D = () => {
     }, (err) => toast.error("Export failed", { description: String(err) }), { binary: true });
   };
 
+  // ── Keyframe animation studio ─────────────────────────────
+  const addKeyframe = () => {
+    const rig = rigRef.current; if (!rig) return;
+    const pose: KeyFrame["pose"] = {};
+    for (const n in rig.bones) { const r = rig.bones[n].rotation; pose[n] = [r.x, r.y, r.z]; }
+    setClip((c) => [...c.filter((k) => Math.abs(k.t - keyT) > 0.01), { t: keyT, pose }].sort((a, b) => a.t - b.t));
+    setKeyT((t) => Math.round((t + 0.5) * 10) / 10);
+    toast.success(`Keyframe at ${keyT.toFixed(1)}s`);
+  };
+  const exportClip = () => {
+    const blob = new Blob([JSON.stringify({ preset, keyframes: clip }, null, 2)], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "animation.json"; a.click();
+  };
+
+  // ── Offline project save/load (stays on this device) ──────
+  const PROJECT_KEY = "codeforge.3d.project.v1";
+  const saveProject = () => {
+    const model = (modelGroupRef.current?.children || []).map((c) => {
+      const m = c as THREE.Mesh;
+      return { name: m.name, prim: (m.userData as any).prim || "box",
+        pos: m.position.toArray(), rot: [m.rotation.x, m.rotation.y, m.rotation.z], scale: m.scale.toArray(),
+        color: "#" + (m.material as THREE.MeshStandardMaterial).color.getHexString() };
+    });
+    localStorage.setItem(PROJECT_KEY, JSON.stringify({ preset, height, headScale, clip, city: [...cityMapRef.current.entries()], model }));
+    toast.success("Project saved on this device");
+  };
+  const loadProject = () => {
+    const raw = localStorage.getItem(PROJECT_KEY);
+    if (!raw) { toast.error("No saved project yet"); return; }
+    try {
+      const d = JSON.parse(raw);
+      setPreset(d.preset); setHeight(d.height); setHeadScale(d.headScale); setClip(d.clip || []);
+      cityMapRef.current = new Map(d.city || []); rebuildCity();
+      clearModel(); const g = ensureModelGroup();
+      for (const it of d.model || []) {
+        const mesh = new THREE.Mesh(makePrimGeometry(it.prim), new THREE.MeshStandardMaterial({ color: it.color, roughness: 0.6 }));
+        mesh.name = it.name; mesh.position.fromArray(it.pos); mesh.rotation.set(it.rot[0], it.rot[1], it.rot[2]); mesh.scale.fromArray(it.scale);
+        mesh.castShadow = true; mesh.userData = { id: Date.now() + Math.random(), prim: it.prim }; g.add(mesh);
+      }
+      syncModelItems();
+      toast.success("Project loaded");
+    } catch { toast.error("Saved project is damaged"); }
+  };
+
   const selectedBoneName = selectedPart && rigRef.current?.parts[selectedPart]?.parent?.name;
 
   return (
@@ -816,6 +864,10 @@ const Editor3D = () => {
             {walking ? "Stop" : "Play"}
           </Button>
         </div>
+        <div className="flex gap-1 mb-1">
+          <Button size="sm" variant="outline" className="h-6 text-[10px] flex-1" onClick={saveProject}>Save (offline)</Button>
+          <Button size="sm" variant="outline" className="h-6 text-[10px] flex-1" onClick={loadProject}>Load</Button>
+        </div>
         <div className="flex gap-1">
           {(["model", "character", "city", "scene"] as Mode[]).map((m) => {
             const Icon = m === "character" ? User : m === "city" ? Building2 : m === "model" ? BoxIcon : Sparkles;
@@ -844,7 +896,7 @@ const Editor3D = () => {
             <>
               <div>
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Preset</div>
-                <div className="grid grid-cols-4 gap-1">
+                <div className="grid grid-cols-3 gap-1">
                   {(Object.keys(CHAR_PRESETS) as Preset[]).map((p) => (
                     <Button key={p} size="sm" variant={preset === p ? "default" : "outline"}
                       className="h-7 text-[10px] capitalize" onClick={() => setPreset(p)}>{p}</Button>
@@ -895,6 +947,19 @@ const Editor3D = () => {
                   ))}
                 </div>
               )}
+              <div className="pt-2 border-t border-border space-y-1">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Animation studio · {clip.length} keys</div>
+                <div className="text-[10px] text-muted-foreground">Pause, pose the body, then add a key. Repeat at later times, then play.</div>
+                <div className="flex justify-between text-[10px]"><span>Key time</span><span className="text-muted-foreground">{keyT.toFixed(1)}s</span></div>
+                <Slider min={0} max={10} step={0.1} value={[keyT]} onValueChange={(v) => setKeyT(v[0])} />
+                <div className="grid grid-cols-2 gap-1">
+                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={addKeyframe}><Plus className="w-3 h-3 mr-1" />Add key</Button>
+                  <Button size="sm" variant={anim === "custom" && playing ? "default" : "outline"} className="h-7 text-[10px]" disabled={clip.length < 2}
+                    onClick={() => { setAnim("custom"); setPlaying(true); }}><Play className="w-3 h-3 mr-1" />Play mine</Button>
+                  <Button size="sm" variant="outline" className="h-7 text-[10px]" disabled={!clip.length} onClick={exportClip}><Download className="w-3 h-3 mr-1" />Export</Button>
+                  <Button size="sm" variant="outline" className="h-7 text-[10px]" disabled={!clip.length} onClick={() => { setClip([]); setKeyT(0); }}><Trash2 className="w-3 h-3 mr-1" />Clear</Button>
+                </div>
+              </div>
               {!selectedPart && !playing && (
                 <div className="text-[10px] text-muted-foreground">Pause + click a body part to pose it</div>
               )}
