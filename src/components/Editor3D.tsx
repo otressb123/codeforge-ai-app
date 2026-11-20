@@ -860,6 +860,75 @@ const Editor3D = () => {
     toast.success(`Camera shot at ${shotT.toFixed(1)}s`);
     setShotT((t) => Math.round((t + 2) * 10) / 10);
   };
+  // ── Record the scene as a video (WebM) ─────────────────────
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const [recording, setRecording] = useState(false);
+  const startRecording = (autoStop: boolean) => {
+    const canvas = rendererRef.current?.domElement; if (!canvas) return;
+    if (typeof MediaRecorder === "undefined") { toast.error("This browser can't record video"); return; }
+    const stream = canvas.captureStream(30);
+    const type = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+    const rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 6_000_000 });
+    const chunks: Blob[] = [];
+    rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    rec.onstop = () => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob(chunks, { type: "video/webm" }));
+      a.download = "anime-scene.webm"; a.click();
+      setRecording(false); toast.success("Video saved: anime-scene.webm");
+    };
+    rec.start(); recorderRef.current = rec; setRecording(true);
+    if (autoStop) {
+      const stop = () => { rec.state !== "inactive" && rec.stop(); window.removeEventListener("cf-cine-end", stop); };
+      window.addEventListener("cf-cine-end", stop);
+    }
+  };
+  const stopRecording = () => { const r = recorderRef.current; if (r && r.state !== "inactive") r.stop(); };
+  const recordScene = () => {
+    if (camKeys.length >= 2) { startRecording(true); playScene(); }
+    else { startRecording(false); toast.info("Recording — press Stop when done"); }
+  };
+
+  // ── Export a playable game (single HTML file, works offline after first open) ─
+  const exportGame = () => {
+    const wrap = new THREE.Group();
+    if (charGroupRef.current) { const c = charGroupRef.current.clone(true); c.name = "player"; c.position.set(0, 0, 0); c.visible = true; wrap.add(c); }
+    if (cityGroupRef.current) { const c = cityGroupRef.current.clone(true); c.visible = true; wrap.add(c); }
+    if (modelGroupRef.current) { const c = modelGroupRef.current.clone(true); c.visible = true; wrap.add(c); }
+    for (const a of actorsRef.current) wrap.add(a.group.clone(true));
+    new GLTFExporter().parse(wrap, (result) => {
+      const bytes = new Uint8Array(result as ArrayBuffer);
+      let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      const b64 = btoa(bin);
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>My CodeForge Game</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#0a0e1a;font-family:system-ui}#hud{position:fixed;top:12px;left:12px;color:#e2e8f0;font-size:13px;background:#0008;padding:8px 12px;border-radius:8px}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script></head>
+<body><div id="hud">WASD / arrows move · Shift run · Space jump</div><script type="module">
+import * as THREE from "three"; import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x0a0e1a); scene.fog=new THREE.Fog(0x0a0e1a,25,90);
+const cam=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,300);
+const r=new THREE.WebGLRenderer({antialias:true}); r.setPixelRatio(Math.min(2,devicePixelRatio)); r.setSize(innerWidth,innerHeight); document.body.appendChild(r.domElement);
+scene.add(new THREE.HemisphereLight(0xffffff,0x334155,0.9)); const sun=new THREE.DirectionalLight(0xffffff,1.2); sun.position.set(10,15,8); scene.add(sun);
+const g=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x1e293b})); g.rotation.x=-Math.PI/2; scene.add(g);
+const raw=atob("${b64}"); const buf=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++)buf[i]=raw.charCodeAt(i);
+let player=null; new GLTFLoader().parse(buf.buffer,"",(gl)=>{scene.add(gl.scene); player=gl.scene.getObjectByName("player")||gl.scene;});
+const k={}; addEventListener("keydown",e=>k[e.key.toLowerCase()]=true); addEventListener("keyup",e=>k[e.key.toLowerCase()]=false);
+let vy=0,last=performance.now();
+function loop(now){const dt=Math.min(0.05,(now-last)/1000); last=now;
+ if(player){const f=(k.w||k.arrowup?1:0)-(k.s||k.arrowdown?1:0), s=(k.d||k.arrowright?1:0)-(k.a||k.arrowleft?1:0);
+  const sp=k.shift?5:2.4; if(f||s){const a=Math.atan2(s,f); player.rotation.y=a; player.position.x+=Math.sin(a)*sp*dt; player.position.z+=Math.cos(a)*sp*dt;}
+  vy-=9.8*dt; player.position.y=Math.max(0,player.position.y+vy*dt); if(player.position.y===0){vy=0; if(k[" "])vy=4.5;}
+  cam.position.lerp(new THREE.Vector3(player.position.x,player.position.y+3,player.position.z-5),0.1); cam.lookAt(player.position.x,player.position.y+1.2,player.position.z);}
+ r.render(scene,cam); requestAnimationFrame(loop);} requestAnimationFrame(loop);
+addEventListener("resize",()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();r.setSize(innerWidth,innerHeight);});
+</script></body></html>`;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+      a.download = "my-game.html"; a.click();
+      toast.success("Game exported: my-game.html — open it in any browser");
+    }, (err) => toast.error("Game export failed", { description: String(err) }), { binary: true });
+  };
+
   const playScene = () => {
     if (camKeys.length < 2) { toast.error("Add at least 2 camera shots"); return; }
     if (ctrlRef.current) ctrlRef.current.enabled = false;
@@ -1022,6 +1091,15 @@ const Editor3D = () => {
                   <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={addShot}><Plus className="w-3 h-3 mr-1" />Shot</Button>
                   <Button size="sm" variant={filming ? "default" : "outline"} className="h-7 text-[10px]" disabled={camKeys.length < 2 || filming} onClick={playScene}><Play className="w-3 h-3 mr-1" />Play</Button>
                   <Button size="sm" variant="outline" className="h-7 text-[10px]" disabled={!camKeys.length} onClick={() => { setCamKeys([]); setShotT(0); }}><Trash2 className="w-3 h-3" /></Button>
+                </div>
+                <div className="grid grid-cols-2 gap-1">
+                  <Button size="sm" variant={recording ? "destructive" : "outline"} className="h-7 text-[10px]"
+                    onClick={recording ? stopRecording : recordScene}>
+                    {recording ? "■ Stop recording" : "● Record video"}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={exportGame}>
+                    <Gamepad2 className="w-3 h-3 mr-1" />Export game
+                  </Button>
                 </div>
               </div>
               <div className="pt-2 border-t border-border space-y-1">
