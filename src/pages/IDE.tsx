@@ -30,6 +30,7 @@ import Editor3D from "@/components/Editor3D";
 import ImageStudioPanel from "@/components/ImageStudioPanel";
 import PythonPanel from "@/components/PythonPanel";
 import Anime2DStudio from "@/components/Anime2DStudio";
+import SculptStudio from "@/components/SculptStudio";
 import TemplateGallery from "@/components/TemplateGallery";
 import CommandPalette from "@/components/CommandPalette";
 import StatusBar from "@/components/StatusBar";
@@ -37,7 +38,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { toast } from "sonner";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
-type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "editor3d" | "imagestudio" | "templates" | "python" | "anime2d";
+type SidebarTab = "files" | "search" | "ai" | "components" | "pages" | "assets" | "extensions" | "git" | "terminal" | "settings" | "history" | "memory" | "collab" | "editor3d" | "imagestudio" | "templates" | "python" | "anime2d" | "sculpt";
 
 interface OpenFile {
   path: string;
@@ -673,6 +674,8 @@ const IDE = () => {
         return <Editor3D />;
       case "imagestudio":
         return <ImageStudioPanel />;
+      case "sculpt":
+        return <SculptStudio />;
       case "anime2d":
         return <Anime2DStudio />;
       case "python": {
