@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { encodeGeometry, decodeGeometry, receiveSculpt } from "@/lib/meshTransfer";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -754,6 +756,34 @@ const Editor3D = () => {
     mat.color.set(color); mat.wireframe = wire;
   };
 
+  const placeImported = (obj: THREE.Object3D) => {
+    // Fit to ~1.5 units tall, sitting on the ground
+    const box = new THREE.Box3().setFromObject(obj); const size = box.getSize(new THREE.Vector3());
+    const k = 1.5 / Math.max(size.x, size.y, size.z, 0.001);
+    obj.scale.multiplyScalar(k);
+    const b2 = new THREE.Box3().setFromObject(obj);
+    obj.position.y -= b2.min.y;
+    obj.traverse((o) => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    const g = ensureModelGroup(); g.add(obj); g.visible = true; syncModelItems();
+    if ((obj as THREE.Mesh).isMesh) selectMesh(obj as THREE.Mesh);
+  };
+  const importSculpt = () => {
+    const d = receiveSculpt();
+    if (!d) { toast.error("No sculpt sent yet — open Sculpt and press Send to 3D Editor"); return; }
+    const mesh = new THREE.Mesh(decodeGeometry(d.pos, d.index), new THREE.MeshStandardMaterial({ color: d.color, roughness: 0.55 }));
+    mesh.name = d.name; mesh.userData = { id: Date.now() + Math.floor(Math.random() * 1000), prim: "sculpt" };
+    placeImported(mesh); toast.success("Sculpt added to your model");
+  };
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const importFile = (file: File) => {
+    const url = URL.createObjectURL(file);
+    new GLTFLoader().load(url, (gltf) => {
+      const obj = gltf.scene; obj.name = file.name.replace(/\.(glb|gltf)$/i, "");
+      obj.userData = { id: Date.now() + Math.floor(Math.random() * 1000), prim: "file" };
+      placeImported(obj); URL.revokeObjectURL(url); toast.success(`Imported ${file.name}`);
+    }, undefined, () => { URL.revokeObjectURL(url); toast.error("Couldn't open that file — use a .glb or .gltf model"); });
+  };
+
   const duplicateSelected = () => {
     const m = selMeshRef.current; const g = modelGroupRef.current;
     if (!m || !g) { toast.error("Select a part first"); return; }
@@ -939,14 +969,20 @@ addEventListener("resize",()=>{cam.aspect=innerWidth/innerHeight;cam.updateProje
   // ── Offline project save/load (stays on this device) ──────
   const PROJECT_KEY = "codeforge.3d.project.v1";
   const saveProject = () => {
-    const model = (modelGroupRef.current?.children || []).map((c) => {
+    const all = modelGroupRef.current?.children || [];
+    const skipped = all.filter((c) => !(c as THREE.Mesh).isMesh).length;
+    if (skipped) toast.info(`${skipped} imported file model(s) aren't saved — import the file again after loading`);
+    const model = all.filter((c) => (c as THREE.Mesh).isMesh).map((c) => {
       const m = c as THREE.Mesh;
-      return { name: m.name, prim: (m.userData as any).prim || "box",
+      const prim = (m.userData as any).prim || "box";
+      return { name: m.name, prim, geo: prim === "sculpt" ? encodeGeometry(m.geometry) : undefined,
         pos: m.position.toArray(), rot: [m.rotation.x, m.rotation.y, m.rotation.z], scale: m.scale.toArray(),
         color: "#" + (m.material as THREE.MeshStandardMaterial).color.getHexString() };
     });
-    localStorage.setItem(PROJECT_KEY, JSON.stringify({ preset, height, headScale, clip, camKeys, city: [...cityMapRef.current.entries()], model }));
-    toast.success("Project saved on this device");
+    try {
+      localStorage.setItem(PROJECT_KEY, JSON.stringify({ preset, height, headScale, clip, camKeys, city: [...cityMapRef.current.entries()], model }));
+      toast.success("Project saved on this device");
+    } catch { toast.error("Project too big to save on this device — export it as a model instead"); }
   };
   const loadProject = () => {
     const raw = localStorage.getItem(PROJECT_KEY);
@@ -957,7 +993,7 @@ addEventListener("resize",()=>{cam.aspect=innerWidth/innerHeight;cam.updateProje
       cityMapRef.current = new Map(d.city || []); rebuildCity();
       clearModel(); const g = ensureModelGroup();
       for (const it of d.model || []) {
-        const mesh = new THREE.Mesh(makePrimGeometry(it.prim), new THREE.MeshStandardMaterial({ color: it.color, roughness: 0.6 }));
+        const mesh = new THREE.Mesh(it.prim === "sculpt" && it.geo ? decodeGeometry(it.geo.pos, it.geo.index) : makePrimGeometry(it.prim), new THREE.MeshStandardMaterial({ color: it.color, roughness: 0.6 }));
         mesh.name = it.name; mesh.position.fromArray(it.pos); mesh.rotation.set(it.rot[0], it.rot[1], it.rot[2]); mesh.scale.fromArray(it.scale);
         mesh.castShadow = true; mesh.userData = { id: Date.now() + Math.random(), prim: it.prim }; g.add(mesh);
       }
@@ -1167,6 +1203,15 @@ addEventListener("resize",()=>{cam.aspect=innerWidth/innerHeight;cam.updateProje
 
           {mode === "model" && (
             <>
+              <div>
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Bring in a model</div>
+                <div className="grid grid-cols-2 gap-1">
+                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={importSculpt}>Import sculpt</Button>
+                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => fileInputRef.current?.click()}>Import file (.glb)</Button>
+                </div>
+                <input ref={fileInputRef} type="file" accept=".glb,.gltf" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) importFile(f); e.target.value = ""; }} />
+              </div>
               <div>
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Add primitive</div>
                 <div className="grid grid-cols-3 gap-1">

@@ -6,8 +6,9 @@ import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Hand, Download, Save, FolderOpen, RotateCcw, Undo2 } from "lucide-react";
+import { Hand, Download, Save, FolderOpen, RotateCcw, Undo2, Send } from "lucide-react";
 import { toast } from "sonner";
+import { sendSculpt } from "@/lib/meshTransfer";
 
 type Brush = "pull" | "push" | "smooth" | "flatten" | "pinch";
 type Base = "sphere" | "head" | "box" | "cylinder";
@@ -177,6 +178,11 @@ const SculptStudio = () => {
       a.download = "sculpt.glb"; a.click(); toast.success("Exported sculpt.glb");
     }, () => toast.error("Export failed"), { binary: true });
   };
+  const sendTo3D = () => {
+    const m = meshRef.current; if (!m) return;
+    try { sendSculpt(m, color, `sculpt_${base}`); toast.success("Sent! Open the 3D Editor → model → Import sculpt"); }
+    catch { toast.error("Sculpt too big to send — export the model and import the file instead"); }
+  };
   const save = () => {
     const m = meshRef.current; if (!m) return;
     const p = m.geometry.attributes.position.array as Float32Array;
@@ -212,6 +218,7 @@ const SculptStudio = () => {
         </div>
       </div>
       <div ref={mountRef} className="h-80 border-b border-border" />
+      <div className="px-3 pt-2"><Button size="sm" className="w-full h-7 text-[10px]" onClick={sendTo3D}><Send className="w-3 h-3 mr-1" />Send to 3D Editor</Button></div>
       <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border">Left-drag on the clay to sculpt · right-drag to turn · scroll to zoom</div>
       <div className="p-3 space-y-3 overflow-auto">
         <div>
