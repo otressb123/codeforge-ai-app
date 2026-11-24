@@ -3,22 +3,30 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
-import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { mergeVertices, mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Hand, Download, Save, FolderOpen, RotateCcw, Undo2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { sendSculpt } from "@/lib/meshTransfer";
-import { buildRig, makeClip, clipFromKeys, BONES, type RigAnim, type PoseKey } from "@/lib/autoRig";
+import { buildRig, makeClip, clipFromKeys, BONES, HUMAN, buildHumanRig, makeHumanClip, type HumanAnim, type RigAnim, type PoseKey } from "@/lib/autoRig";
 
 type Brush = "pull" | "push" | "smooth" | "flatten" | "pinch";
-type Base = "sphere" | "head" | "box" | "cylinder";
+type Base = "sphere" | "head" | "box" | "cylinder" | "body";
 const STORE = "codeforge.sculpt.v1";
 
 const makeBase = (b: Base) => {
   let g: THREE.BufferGeometry;
   if (b === "box") g = new THREE.BoxGeometry(1.4, 1.4, 1.4, 48, 48, 48);
   else if (b === "cylinder") g = new THREE.CylinderGeometry(0.7, 0.7, 1.8, 96, 64);
+  else if (b === "body") {
+    const part = (p: THREE.BufferGeometry, x: number, y: number) => { p.translate(x, y, 0); p.deleteAttribute("uv"); p.deleteAttribute("normal"); return p; };
+    g = mergeGeometries([
+      part(new THREE.CylinderGeometry(0.32, 0.26, 0.85, 48, 24), 0, 0.2), part(new THREE.SphereGeometry(0.26, 48, 32), 0, 0.9),
+      part(new THREE.CylinderGeometry(0.08, 0.07, 0.85, 24, 24), 0.42, 0.15), part(new THREE.CylinderGeometry(0.08, 0.07, 0.85, 24, 24), -0.42, 0.15),
+      part(new THREE.CylinderGeometry(0.12, 0.09, 1.0, 24, 28), 0.15, -0.7), part(new THREE.CylinderGeometry(0.12, 0.09, 1.0, 24, 28), -0.15, -0.7),
+    ])!;
+  }
   else g = new THREE.SphereGeometry(1, 128, 96);
   g.deleteAttribute("uv"); g.deleteAttribute("normal");
   g = mergeVertices(g);
@@ -53,11 +61,14 @@ const SculptStudio = () => {
   const [strength, setStrength] = useState(0.5);
   const [symmetry, setSymmetry] = useState(true);
   const [color, setColor] = useState("#e8c4a8");
-  const [base, setBase] = useState<Base>("head");
+  const [base, setBase] = useState<Base>("body");
   const [wire, setWire] = useState(false);
   const [anim, setAnim] = useState<RigAnim | "none" | "pose">("none");
-  const [bone, setBone] = useState(BONES - 1);
-  const [rot, setRot] = useState<[number, number, number][]>(() => Array.from({ length: BONES }, () => [0, 0, 0]));
+  const [skel, setSkel] = useState<"chain" | "human">("human");
+  const boneNames = skel === "human" ? HUMAN.map((b) => b[0]) : Array.from({ length: BONES }, (_, i) => (i === 0 ? "Base" : i === BONES - 1 ? "Top" : `${i}`));
+  const zeroRot = (n: number) => Array.from({ length: n }, () => [0, 0, 0] as [number, number, number]);
+  const [bone, setBone] = useState(3);
+  const [rot, setRot] = useState<[number, number, number][]>(() => zeroRot(HUMAN.length));
   const [keys, setKeys] = useState<PoseKey[]>([]);
   const [keyT, setKeyT] = useState(0);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -83,7 +94,7 @@ const SculptStudio = () => {
     const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(3, 4, 5); scene.add(key);
     const rim = new THREE.DirectionalLight(0x9db4ff, 0.6); rim.position.set(-4, 2, -3); scene.add(rim);
 
-    const mesh = new THREE.Mesh(makeBase("head"), new THREE.MeshStandardMaterial({ color: 0xe8c4a8, roughness: 0.55 }));
+    const mesh = new THREE.Mesh(makeBase("body"), new THREE.MeshStandardMaterial({ color: 0xe8c4a8, roughness: 0.55 }));
     scene.add(mesh); meshRef.current = mesh; neighRef.current = buildNeighbors(mesh.geometry);
 
     const cursor = new THREE.Mesh(new THREE.RingGeometry(0.97, 1, 48), new THREE.MeshBasicMaterial({ color: 0x22d3ee, side: THREE.DoubleSide, depthTest: false }));
@@ -178,13 +189,13 @@ const SculptStudio = () => {
     rig.mixer.stopAllAction(); sceneRef.current?.remove(rig.mesh); rig.mesh.geometry.dispose();
     rigRef.current = null; if (meshRef.current) meshRef.current.visible = true;
   };
-  const playAnim = (a: RigAnim | "none" | "pose" | "custom") => {
+  const playAnim = (a: RigAnim | HumanAnim | "none" | "pose" | "custom", sk = skel) => {
     let clip: THREE.AnimationClip | null = null;
     if (a === "custom") { clip = clipFromKeys(keys); if (!clip) { toast.error("Save at least 2 poses first"); return; } }
     stopRig(); setAnim(a === "custom" ? "pose" : a); const m = meshRef.current; if (a === "none" || !m) return;
-    const mesh = buildRig(m.geometry, m.material as THREE.Material);
+    const mesh = sk === "human" ? buildHumanRig(m.geometry, m.material as THREE.Material) : buildRig(m.geometry, m.material as THREE.Material);
     const mixer = new THREE.AnimationMixer(mesh);
-    if (a !== "pose") { clip = clip ?? makeClip(a as RigAnim); mixer.clipAction(clip).play(); }
+    if (a !== "pose") { clip = clip ?? (sk === "human" ? makeHumanClip(a as HumanAnim) : makeClip(a as RigAnim)); mixer.clipAction(clip).play(); }
     else { clip = clipFromKeys(keys) ?? new THREE.AnimationClip("pose", 0, []); applyPose(mesh, rot); } sceneRef.current?.add(mesh); m.visible = false;
     rigRef.current = { mesh, mixer, clip };
   };
@@ -278,16 +289,24 @@ const SculptStudio = () => {
         <div>
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Skeleton &amp; animate</div>
           <div className="grid grid-cols-6 gap-1">
-            {(["none", "pose", "sway", "bounce", "dance", "nod"] as const).map((a) => (
+            <div className="col-span-6 grid grid-cols-2 gap-1 mb-1">
+              {(["human", "chain"] as const).map((k) => (
+                <Button key={k} size="sm" variant={skel === k ? "default" : "outline"} className="h-6 text-[10px]" onClick={() => {
+                  setSkel(k); const n = k === "human" ? HUMAN.length : BONES; setRot(zeroRot(n)); setKeys([]); setBone(k === "human" ? 3 : n - 1);
+                  if (anim !== "none") playAnim(anim === "pose" ? "pose" : "none", k);
+                }}>{k === "human" ? "Human (arms + legs)" : "Simple (one chain)"}</Button>
+              ))}
+            </div>
+            {(skel === "human" ? (["none", "pose", "walk", "wave", "dance", "nod"] as const) : (["none", "pose", "sway", "bounce", "dance", "nod"] as const)).map((a) => (
               <Button key={a} size="sm" variant={anim === a ? "default" : "outline"} className="h-7 text-[10px] px-1 capitalize" onClick={() => playAnim(a)}>{a === "none" ? "Off" : a}</Button>
             ))}
           </div>
           {anim === "pose" && (
             <div className="mt-2 space-y-2 border border-border rounded p-2">
               <div className="flex items-center gap-1"><span className="mr-1">Bone</span>
-                {Array.from({ length: BONES }, (_, i) => (
-                  <Button key={i} size="sm" variant={bone === i ? "default" : "outline"} className="h-6 px-2 text-[10px]" onClick={() => setBone(i)}>{i === 0 ? "Base" : i === BONES - 1 ? "Top" : i}</Button>
-                ))}
+                <div className="flex flex-wrap gap-1">{boneNames.map((nm, i) => (
+                  <Button key={i} size="sm" variant={bone === i ? "default" : "outline"} className="h-6 px-2 text-[10px]" onClick={() => setBone(i)}>{nm}</Button>
+                ))}</div>
               </div>
               {["Tilt fwd/back", "Turn", "Lean side"].map((lbl, ax) => (
                 <div key={lbl}>
@@ -314,8 +333,8 @@ const SculptStudio = () => {
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Start from</div>
-          <div className="grid grid-cols-4 gap-1">
-            {(["head", "sphere", "box", "cylinder"] as Base[]).map((b) => (
+          <div className="grid grid-cols-5 gap-1">
+            {(["body", "head", "sphere", "box", "cylinder"] as Base[]).map((b) => (
               <Button key={b} size="sm" variant={base === b ? "default" : "outline"} className="h-7 text-[10px] capitalize" onClick={() => newBase(b)}>
                 {b === base ? <RotateCcw className="w-3 h-3 mr-1" /> : null}{b}
               </Button>
