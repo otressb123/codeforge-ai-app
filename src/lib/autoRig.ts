@@ -49,3 +49,16 @@ export const makeClip = (anim: RigAnim): THREE.AnimationClip => {
   if (anim === "bounce") tracks.push(new THREE.VectorKeyframeTrack("bone0.scale", times, [1,1,1, 1.05,0.9,1.05, 1,1,1, 1.05,0.9,1.05, 1,1,1]));
   return new THREE.AnimationClip(anim, 2, tracks);
 };
+
+/** A saved pose: time in seconds + [x,y,z] rotation for every bone. */
+export interface PoseKey { t: number; rot: [number, number, number][] }
+
+/** Build an animation from your own poses, sorted by time. Needs at least 2 poses. */
+export const clipFromKeys = (keys: PoseKey[]): THREE.AnimationClip | null => {
+  if (keys.length < 2) return null;
+  const ks = [...keys].sort((a, b) => a.t - b.t);
+  const times = ks.map((k) => k.t);
+  const tracks = Array.from({ length: BONES }, (_, i) =>
+    new THREE.QuaternionKeyframeTrack(`bone${i}.quaternion`, times, ks.flatMap((k) => q(...k.rot[i]))));
+  return new THREE.AnimationClip("custom", times[times.length - 1], tracks);
+};

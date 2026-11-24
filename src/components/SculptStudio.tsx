@@ -9,7 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { Hand, Download, Save, FolderOpen, RotateCcw, Undo2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { sendSculpt } from "@/lib/meshTransfer";
-import { buildRig, makeClip, type RigAnim } from "@/lib/autoRig";
+import { buildRig, makeClip, clipFromKeys, BONES, type RigAnim, type PoseKey } from "@/lib/autoRig";
 
 type Brush = "pull" | "push" | "smooth" | "flatten" | "pinch";
 type Base = "sphere" | "head" | "box" | "cylinder";
@@ -55,7 +55,11 @@ const SculptStudio = () => {
   const [color, setColor] = useState("#e8c4a8");
   const [base, setBase] = useState<Base>("head");
   const [wire, setWire] = useState(false);
-  const [anim, setAnim] = useState<RigAnim | "none">("none");
+  const [anim, setAnim] = useState<RigAnim | "none" | "pose">("none");
+  const [bone, setBone] = useState(BONES - 1);
+  const [rot, setRot] = useState<[number, number, number][]>(() => Array.from({ length: BONES }, () => [0, 0, 0]));
+  const [keys, setKeys] = useState<PoseKey[]>([]);
+  const [keyT, setKeyT] = useState(0);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rigRef = useRef<{ mesh: THREE.SkinnedMesh; mixer: THREE.AnimationMixer; clip: THREE.AnimationClip } | null>(null);
   const opts = useRef({ brush, radius, strength, symmetry });
@@ -174,12 +178,25 @@ const SculptStudio = () => {
     rig.mixer.stopAllAction(); sceneRef.current?.remove(rig.mesh); rig.mesh.geometry.dispose();
     rigRef.current = null; if (meshRef.current) meshRef.current.visible = true;
   };
-  const playAnim = (a: RigAnim | "none") => {
-    stopRig(); setAnim(a); const m = meshRef.current; if (a === "none" || !m) return;
+  const playAnim = (a: RigAnim | "none" | "pose" | "custom") => {
+    let clip: THREE.AnimationClip | null = null;
+    if (a === "custom") { clip = clipFromKeys(keys); if (!clip) { toast.error("Save at least 2 poses first"); return; } }
+    stopRig(); setAnim(a === "custom" ? "pose" : a); const m = meshRef.current; if (a === "none" || !m) return;
     const mesh = buildRig(m.geometry, m.material as THREE.Material);
-    const mixer = new THREE.AnimationMixer(mesh); const clip = makeClip(a);
-    mixer.clipAction(clip).play(); sceneRef.current?.add(mesh); m.visible = false;
+    const mixer = new THREE.AnimationMixer(mesh);
+    if (a !== "pose") { clip = clip ?? makeClip(a as RigAnim); mixer.clipAction(clip).play(); }
+    else { clip = clipFromKeys(keys) ?? new THREE.AnimationClip("pose", 0, []); applyPose(mesh, rot); } sceneRef.current?.add(mesh); m.visible = false;
     rigRef.current = { mesh, mixer, clip };
+  };
+  const applyPose = (mesh: THREE.SkinnedMesh, r: [number, number, number][]) =>
+    mesh.skeleton.bones.forEach((b, i) => b.rotation.set(...r[i]));
+  const setAxis = (ax: number, v: number) => {
+    const r = rot.map((x) => [...x] as [number, number, number]); r[bone][ax] = v; setRot(r);
+    const rig = rigRef.current; if (rig) { rig.mixer.stopAllAction(); applyPose(rig.mesh, r); }
+  };
+  const addKey = () => {
+    setKeys((k) => [...k.filter((x) => x.t !== keyT), { t: keyT, rot: rot.map((x) => [...x] as [number, number, number]) }]);
+    toast.success(`Pose saved at ${keyT.toFixed(1)}s`); setKeyT((t) => +(t + 0.5).toFixed(1));
   };
   const newBase = (b: Base) => { playAnim("none"); setBase(b); setGeometry(makeBase(b)); };
   const undo = () => {
@@ -260,11 +277,39 @@ const SculptStudio = () => {
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Skeleton &amp; animate</div>
-          <div className="grid grid-cols-5 gap-1">
-            {(["none", "sway", "bounce", "dance", "nod"] as const).map((a) => (
+          <div className="grid grid-cols-6 gap-1">
+            {(["none", "pose", "sway", "bounce", "dance", "nod"] as const).map((a) => (
               <Button key={a} size="sm" variant={anim === a ? "default" : "outline"} className="h-7 text-[10px] px-1 capitalize" onClick={() => playAnim(a)}>{a === "none" ? "Off" : a}</Button>
             ))}
           </div>
+          {anim === "pose" && (
+            <div className="mt-2 space-y-2 border border-border rounded p-2">
+              <div className="flex items-center gap-1"><span className="mr-1">Bone</span>
+                {Array.from({ length: BONES }, (_, i) => (
+                  <Button key={i} size="sm" variant={bone === i ? "default" : "outline"} className="h-6 px-2 text-[10px]" onClick={() => setBone(i)}>{i === 0 ? "Base" : i === BONES - 1 ? "Top" : i}</Button>
+                ))}
+              </div>
+              {["Tilt fwd/back", "Turn", "Lean side"].map((lbl, ax) => (
+                <div key={lbl}>
+                  <div className="flex justify-between"><span>{lbl}</span><span className="text-muted-foreground">{Math.round(rot[bone][ax] * 57.3)}°</span></div>
+                  <Slider min={-1.2} max={1.2} step={0.02} value={[rot[bone][ax]]} onValueChange={(v) => setAxis(ax, v[0])} />
+                </div>
+              ))}
+              <div className="flex items-center gap-1">
+                <span>Time</span>
+                <input type="number" step={0.1} min={0} value={keyT} onChange={(e) => setKeyT(Math.max(0, +e.target.value))} className="w-14 h-6 bg-background border border-border rounded px-1" />
+                <span>s</span>
+                <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] ml-auto" onClick={addKey}>Save pose</Button>
+                <Button size="sm" className="h-6 px-2 text-[10px]" onClick={() => playAnim("custom")}>Play</Button>
+              </div>
+              <div className="flex flex-wrap gap-1 text-[10px] text-muted-foreground">
+                {[...keys].sort((a, b) => a.t - b.t).map((k) => (
+                  <button key={k.t} className="px-1 border border-border rounded hover:text-foreground" title="Click to remove" onClick={() => setKeys((ks) => ks.filter((x) => x.t !== k.t))}>{k.t.toFixed(1)}s ×</button>
+                ))}
+                {!keys.length && <span>Bend the bones, then Save pose. Save 2+ poses at different times and press Play.</span>}
+              </div>
+            </div>
+          )}
           {anim !== "none" && <div className="text-[10px] text-muted-foreground mt-1">A skeleton is added automatically. Sculpting is paused while it moves. Export keeps the animation.</div>}
         </div>
         <div>
