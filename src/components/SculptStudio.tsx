@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { Hand, Download, Save, FolderOpen, RotateCcw, Undo2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { sendSculpt } from "@/lib/meshTransfer";
+import { buildRig, makeClip, type RigAnim } from "@/lib/autoRig";
 
 type Brush = "pull" | "push" | "smooth" | "flatten" | "pinch";
 type Base = "sphere" | "head" | "box" | "cylinder";
@@ -54,6 +55,9 @@ const SculptStudio = () => {
   const [color, setColor] = useState("#e8c4a8");
   const [base, setBase] = useState<Base>("head");
   const [wire, setWire] = useState(false);
+  const [anim, setAnim] = useState<RigAnim | "none">("none");
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const rigRef = useRef<{ mesh: THREE.SkinnedMesh; mixer: THREE.AnimationMixer; clip: THREE.AnimationClip } | null>(null);
   const opts = useRef({ brush, radius, strength, symmetry });
   opts.current = { brush, radius, strength, symmetry };
 
@@ -64,7 +68,7 @@ const SculptStudio = () => {
 
   useEffect(() => {
     const mount = mountRef.current!;
-    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1a1d26);
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1a1d26); sceneRef.current = scene;
     const cam = new THREE.PerspectiveCamera(40, mount.clientWidth / mount.clientHeight, 0.1, 100); cam.position.set(0, 0.3, 4.2);
     const r = new THREE.WebGLRenderer({ antialias: true }); r.setPixelRatio(Math.min(2, devicePixelRatio));
     r.setSize(mount.clientWidth, mount.clientHeight); mount.appendChild(r.domElement);
@@ -135,7 +139,7 @@ const SculptStudio = () => {
       }
     };
     const onDown = (e: PointerEvent) => {
-      if (e.button !== 0) return;
+      if (e.button !== 0 || rigRef.current) return;
       const h = hitAt(e); if (!h) return;
       down = true; ctrl.enabled = false;
       const p = mesh.geometry.attributes.position.array as Float32Array;
@@ -149,7 +153,8 @@ const SculptStudio = () => {
     r.domElement.addEventListener("contextmenu", (e) => e.preventDefault());
 
     let raf = 0;
-    const tick = () => { ctrl.update(); r.render(scene, cam); raf = requestAnimationFrame(tick); };
+    const clock = new THREE.Clock();
+    const tick = () => { rigRef.current?.mixer.update(clock.getDelta()); ctrl.update(); r.render(scene, cam); raf = requestAnimationFrame(tick); };
     tick();
     const ro = new ResizeObserver(() => { cam.aspect = mount.clientWidth / mount.clientHeight; cam.updateProjectionMatrix(); r.setSize(mount.clientWidth, mount.clientHeight); });
     ro.observe(mount);
@@ -164,7 +169,19 @@ const SculptStudio = () => {
     const mat = m.material as THREE.MeshStandardMaterial; mat.color.set(color); mat.wireframe = wire;
   }, [color, wire]);
 
-  const newBase = (b: Base) => { setBase(b); setGeometry(makeBase(b)); };
+  const stopRig = () => {
+    const rig = rigRef.current; if (!rig) return;
+    rig.mixer.stopAllAction(); sceneRef.current?.remove(rig.mesh); rig.mesh.geometry.dispose();
+    rigRef.current = null; if (meshRef.current) meshRef.current.visible = true;
+  };
+  const playAnim = (a: RigAnim | "none") => {
+    stopRig(); setAnim(a); const m = meshRef.current; if (a === "none" || !m) return;
+    const mesh = buildRig(m.geometry, m.material as THREE.Material);
+    const mixer = new THREE.AnimationMixer(mesh); const clip = makeClip(a);
+    mixer.clipAction(clip).play(); sceneRef.current?.add(mesh); m.visible = false;
+    rigRef.current = { mesh, mixer, clip };
+  };
+  const newBase = (b: Base) => { playAnim("none"); setBase(b); setGeometry(makeBase(b)); };
   const undo = () => {
     const prev = undoRef.current.pop(); const m = meshRef.current; if (!prev || !m) { toast.info("Nothing to undo"); return; }
     (m.geometry.attributes.position.array as Float32Array).set(prev);
@@ -172,11 +189,12 @@ const SculptStudio = () => {
   };
   const exportGLB = () => {
     const m = meshRef.current; if (!m) return;
-    const out = new THREE.Mesh(m.geometry.clone(), (m.material as THREE.Material).clone()); out.name = "sculpt";
+    const rig = rigRef.current;
+    const out: THREE.Object3D = rig ? rig.mesh : new THREE.Mesh(m.geometry.clone(), (m.material as THREE.Material).clone()); if (!rig) out.name = "sculpt";
     new GLTFExporter().parse(out, (res) => {
       const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([res as ArrayBuffer], { type: "model/gltf-binary" }));
       a.download = "sculpt.glb"; a.click(); toast.success("Exported sculpt.glb");
-    }, () => toast.error("Export failed"), { binary: true });
+    }, () => toast.error("Export failed"), { binary: true, animations: rig ? [rig.clip] : [] });
   };
   const sendTo3D = () => {
     const m = meshRef.current; if (!m) return;
@@ -239,6 +257,15 @@ const SculptStudio = () => {
           <label className="flex items-center gap-1"><input type="checkbox" checked={symmetry} onChange={(e) => setSymmetry(e.target.checked)} />Mirror left/right</label>
           <label className="flex items-center gap-1"><input type="checkbox" checked={wire} onChange={(e) => setWire(e.target.checked)} />Wireframe</label>
           <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-6 h-6 ml-auto bg-transparent" aria-label="Clay color" />
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Skeleton &amp; animate</div>
+          <div className="grid grid-cols-5 gap-1">
+            {(["none", "sway", "bounce", "dance", "nod"] as const).map((a) => (
+              <Button key={a} size="sm" variant={anim === a ? "default" : "outline"} className="h-7 text-[10px] px-1 capitalize" onClick={() => playAnim(a)}>{a === "none" ? "Off" : a}</Button>
+            ))}
+          </div>
+          {anim !== "none" && <div className="text-[10px] text-muted-foreground mt-1">A skeleton is added automatically. Sculpting is paused while it moves. Export keeps the animation.</div>}
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Start from</div>
