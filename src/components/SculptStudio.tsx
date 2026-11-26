@@ -21,11 +21,13 @@ const makeBase = (b: Base) => {
   else if (b === "cylinder") g = new THREE.CylinderGeometry(0.7, 0.7, 1.8, 96, 64);
   else if (b === "body") {
     const part = (p: THREE.BufferGeometry, x: number, y: number) => { p.translate(x, y, 0); p.deleteAttribute("uv"); p.deleteAttribute("normal"); return p; };
-    g = mergeGeometries([
+    const merged = mergeGeometries([
       part(new THREE.CylinderGeometry(0.32, 0.26, 0.85, 48, 24), 0, 0.2), part(new THREE.SphereGeometry(0.26, 48, 32), 0, 0.9),
       part(new THREE.CylinderGeometry(0.08, 0.07, 0.85, 24, 24), 0.42, 0.15), part(new THREE.CylinderGeometry(0.08, 0.07, 0.85, 24, 24), -0.42, 0.15),
       part(new THREE.CylinderGeometry(0.12, 0.09, 1.0, 24, 28), 0.15, -0.7), part(new THREE.CylinderGeometry(0.12, 0.09, 1.0, 24, 28), -0.15, -0.7),
-    ])!;
+    ]);
+    if (!merged) throw new Error("Could not build body geometry");
+    g = merged;
   }
   else g = new THREE.SphereGeometry(1, 128, 96);
   g.deleteAttribute("uv"); g.deleteAttribute("normal");
@@ -63,7 +65,7 @@ const SculptStudio = () => {
   const [color, setColor] = useState("#e8c4a8");
   const [base, setBase] = useState<Base>("body");
   const [wire, setWire] = useState(false);
-  const [anim, setAnim] = useState<RigAnim | "none" | "pose">("none");
+  const [anim, setAnim] = useState<RigAnim | HumanAnim | "none" | "pose">("none");
   const [skel, setSkel] = useState<"chain" | "human">("human");
   const boneNames = skel === "human" ? HUMAN.map((b) => b[0]) : Array.from({ length: BONES }, (_, i) => (i === 0 ? "Base" : i === BONES - 1 ? "Top" : `${i}`));
   const zeroRot = (n: number) => Array.from({ length: n }, () => [0, 0, 0] as [number, number, number]);
@@ -200,7 +202,7 @@ const SculptStudio = () => {
     rigRef.current = { mesh, mixer, clip };
   };
   const applyPose = (mesh: THREE.SkinnedMesh, r: [number, number, number][]) =>
-    mesh.skeleton.bones.forEach((b, i) => b.rotation.set(...r[i]));
+    mesh.skeleton.bones.forEach((b, i) => { const rotation = r[i]; if (rotation) b.rotation.set(...rotation); });
   const setAxis = (ax: number, v: number) => {
     const r = rot.map((x) => [...x] as [number, number, number]); r[bone][ax] = v; setRot(r);
     const rig = rigRef.current; if (rig) { rig.mixer.stopAllAction(); applyPose(rig.mesh, r); }
@@ -243,7 +245,7 @@ const SculptStudio = () => {
       const d = JSON.parse(raw); const g = makeBase(d.base);
       const bin = atob(d.pos); const buf = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
       (g.attributes.position.array as Float32Array).set(new Float32Array(buf.buffer));
-      g.computeVertexNormals(); setGeometry(g); setBase(d.base); setColor(d.color); toast.success("Sculpt loaded");
+      g.computeVertexNormals(); playAnim("none"); setGeometry(g); setBase(d.base); setColor(d.color); toast.success("Sculpt loaded");
     } catch { toast.error("Saved sculpt is damaged"); }
   };
 
@@ -263,7 +265,7 @@ const SculptStudio = () => {
           <Button size="sm" variant="outline" className="h-6 px-2" onClick={exportGLB} title="Export model"><Download className="w-3 h-3" /></Button>
         </div>
       </div>
-      <div ref={mountRef} className="h-80 border-b border-border" />
+      <div ref={mountRef} className="h-80 shrink-0 border-b border-border" />
       <div className="px-3 pt-2"><Button size="sm" className="w-full h-7 text-[10px]" onClick={sendTo3D}><Send className="w-3 h-3 mr-1" />Send to 3D Editor</Button></div>
       <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border">Left-drag on the clay to sculpt · right-drag to turn · scroll to zoom</div>
       <div className="p-3 space-y-3 overflow-auto">
@@ -293,7 +295,7 @@ const SculptStudio = () => {
               {(["human", "chain"] as const).map((k) => (
                 <Button key={k} size="sm" variant={skel === k ? "default" : "outline"} className="h-6 text-[10px]" onClick={() => {
                   setSkel(k); const n = k === "human" ? HUMAN.length : BONES; setRot(zeroRot(n)); setKeys([]); setBone(k === "human" ? 3 : n - 1);
-                  if (anim !== "none") playAnim(anim === "pose" ? "pose" : "none", k);
+                  playAnim("none", k);
                 }}>{k === "human" ? "Human (arms + legs)" : "Simple (one chain)"}</Button>
               ))}
             </div>

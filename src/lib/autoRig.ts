@@ -14,7 +14,9 @@ export const boneWeights = (t: number, n = BONES): [number, number, number, numb
 
 export const buildRig = (geo: THREE.BufferGeometry, mat: THREE.Material) => {
   const g = geo.clone(); g.computeBoundingBox();
-  const { min, max } = g.boundingBox!; const h = Math.max(max.y - min.y, 1e-4);
+  const bounds = g.boundingBox;
+  if (!bounds) throw new Error("Cannot rig geometry without bounds");
+  const { min, max } = bounds; const h = Math.max(max.y - min.y, 1e-4);
   const pos = g.attributes.position; const si: number[] = []; const sw: number[] = [];
   for (let i = 0; i < pos.count; i++) {
     const [a, b, wa, wb] = boneWeights((pos.getY(i) - min.y) / h);
@@ -68,10 +70,10 @@ export type HumanAnim = "walk" | "wave" | "dance" | "nod";
 // [name, parent, joint x (fraction of half-width), joint y (fraction of height)]
 export const HUMAN: [string, number, number, number][] = [
   ["Hips", -1, 0, 0.5], ["Spine", 0, 0, 0.62], ["Chest", 1, 0, 0.75], ["Head", 2, 0, 0.86],
-  ["L arm", 2, 0.3, 0.78], ["L forearm", 4, 0.45, 0.6], ["R arm", 2, -0.3, 0.78], ["R forearm", 6, -0.45, 0.6],
-  ["L thigh", 0, 0.15, 0.48], ["L shin", 8, 0.15, 0.25], ["R thigh", 0, -0.15, 0.48], ["R shin", 10, -0.15, 0.25],
+  ["L arm", 2, 0.84, 0.75], ["L forearm", 4, 0.84, 0.56], ["R arm", 2, -0.84, 0.75], ["R forearm", 6, -0.84, 0.56],
+  ["L thigh", 0, 0.3, 0.48], ["L shin", 8, 0.3, 0.25], ["R thigh", 0, -0.3, 0.48], ["R shin", 10, -0.3, 0.25],
 ];
-const ENDS: Record<number, [number, number]> = { 3: [0, 1], 5: [0.5, 0.42], 7: [-0.5, 0.42], 9: [0.15, 0], 11: [-0.15, 0] };
+const ENDS: Record<number, [number, number]> = { 3: [0, 1], 5: [0.84, 0.39], 7: [-0.84, 0.39], 9: [0.3, 0], 11: [-0.3, 0] };
 
 const segDist = (px: number, py: number, ax: number, ay: number, bx: number, by: number) => {
   const dx = bx - ax, dy = by - ay; const l = dx * dx + dy * dy || 1e-6;
@@ -94,7 +96,9 @@ export const humanWeights = (fx: number, fy: number): [number, number, number, n
 
 export const buildHumanRig = (geo: THREE.BufferGeometry, mat: THREE.Material) => {
   const g = geo.clone(); g.computeBoundingBox();
-  const { min, max } = g.boundingBox!; const h = Math.max(max.y - min.y, 1e-4);
+  const bounds = g.boundingBox;
+  if (!bounds) throw new Error("Cannot rig geometry without bounds");
+  const { min, max } = bounds; const h = Math.max(max.y - min.y, 1e-4);
   const cx = (min.x + max.x) / 2, hw = Math.max((max.x - min.x) / 2, 1e-4);
   const pos = g.attributes.position; const si: number[] = []; const sw: number[] = [];
   for (let i = 0; i < pos.count; i++) {
