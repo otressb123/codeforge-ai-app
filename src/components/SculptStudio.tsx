@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { Hand, Download, Save, FolderOpen, RotateCcw, Undo2, Send } from "lucide-react";
 import { toast } from "sonner";
 import { sendSculpt } from "@/lib/meshTransfer";
+import { serializeSculptProject, parseSculptProject, type SculptProject } from "@/lib/sculptProject";
 import { buildRig, makeClip, clipFromKeys, BONES, HUMAN, buildHumanRig, makeHumanClip, type HumanAnim, type RigAnim, type PoseKey } from "@/lib/autoRig";
 
 type Brush = "pull" | "push" | "smooth" | "flatten" | "pinch";
@@ -44,7 +45,9 @@ const makeBase = (b: Base) => {
 };
 
 const buildNeighbors = (g: THREE.BufferGeometry) => {
-  const idx = g.index!.array; const n: Set<number>[] = Array.from({ length: g.attributes.position.count }, () => new Set());
+  const n: Set<number>[] = Array.from({ length: g.attributes.position.count }, () => new Set());
+  const idx = g.index?.array;
+  if (!idx) return n.map(() => []);
   for (let i = 0; i < idx.length; i += 3) {
     const a = idx[i], b = idx[i + 1], c = idx[i + 2];
     n[a].add(b).add(c); n[b].add(a).add(c); n[c].add(a).add(b);
@@ -65,7 +68,8 @@ const SculptStudio = () => {
   const [color, setColor] = useState("#e8c4a8");
   const [base, setBase] = useState<Base>("body");
   const [wire, setWire] = useState(false);
-  const [anim, setAnim] = useState<RigAnim | HumanAnim | "none" | "pose">("none");
+  const [anim, setAnim] = useState<SculptProject["animation"]>("none");
+  const projectInputRef = useRef<HTMLInputElement>(null);
   const [skel, setSkel] = useState<"chain" | "human">("human");
   const boneNames = skel === "human" ? HUMAN.map((b) => b[0]) : Array.from({ length: BONES }, (_, i) => (i === 0 ? "Base" : i === BONES - 1 ? "Top" : `${i}`));
   const zeroRot = (n: number) => Array.from({ length: n }, () => [0, 0, 0] as [number, number, number]);
@@ -79,12 +83,12 @@ const SculptStudio = () => {
   opts.current = { brush, radius, strength, symmetry };
 
   const setGeometry = (g: THREE.BufferGeometry) => {
-    const m = meshRef.current!; m.geometry.dispose(); m.geometry = g;
+    const m = meshRef.current; if (!m) { g.dispose(); return; } m.geometry.dispose(); m.geometry = g;
     neighRef.current = buildNeighbors(g); undoRef.current = [];
   };
 
   useEffect(() => {
-    const mount = mountRef.current!;
+    const mount = mountRef.current; if (!mount) return;
     const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1a1d26); sceneRef.current = scene;
     const cam = new THREE.PerspectiveCamera(40, mount.clientWidth / mount.clientHeight, 0.1, 100); cam.position.set(0, 0.3, 4.2);
     const r = new THREE.WebGLRenderer({ antialias: true }); r.setPixelRatio(Math.min(2, devicePixelRatio));
@@ -145,8 +149,8 @@ const SculptStudio = () => {
 
     const stroke = (e: PointerEvent) => {
       const h = hitAt(e);
-      if (!h) { cursor.visible = false; return; }
-      const n = h.face!.normal.clone().transformDirection(mesh.matrixWorld);
+      if (!h?.face) { cursor.visible = false; return; }
+      const n = h.face.normal.clone().transformDirection(mesh.matrixWorld);
       cursor.visible = true; cursor.position.copy(h.point).addScaledVector(n, 0.005);
       cursor.lookAt(h.point.clone().add(n)); cursor.scale.setScalar(opts.current.radius);
       if (!down) return;
@@ -191,14 +195,14 @@ const SculptStudio = () => {
     rig.mixer.stopAllAction(); sceneRef.current?.remove(rig.mesh); rig.mesh.geometry.dispose();
     rigRef.current = null; if (meshRef.current) meshRef.current.visible = true;
   };
-  const playAnim = (a: RigAnim | HumanAnim | "none" | "pose" | "custom", sk = skel) => {
+  const playAnim = (a: SculptProject["animation"], sk = skel, poses = keys, rotations = rot) => {
     let clip: THREE.AnimationClip | null = null;
-    if (a === "custom") { clip = clipFromKeys(keys); if (!clip) { toast.error("Save at least 2 poses first"); return; } }
-    stopRig(); setAnim(a === "custom" ? "pose" : a); const m = meshRef.current; if (a === "none" || !m) return;
+    if (a === "custom") { clip = clipFromKeys(poses); if (!clip) { toast.error("Save at least 2 poses first"); return; } }
+    stopRig(); setAnim(a); const m = meshRef.current; if (a === "none" || !m) return;
     const mesh = sk === "human" ? buildHumanRig(m.geometry, m.material as THREE.Material) : buildRig(m.geometry, m.material as THREE.Material);
     const mixer = new THREE.AnimationMixer(mesh);
     if (a !== "pose") { clip = clip ?? (sk === "human" ? makeHumanClip(a as HumanAnim) : makeClip(a as RigAnim)); mixer.clipAction(clip).play(); }
-    else { clip = clipFromKeys(keys) ?? new THREE.AnimationClip("pose", 0, []); applyPose(mesh, rot); } sceneRef.current?.add(mesh); m.visible = false;
+    else { clip = new THREE.AnimationClip("pose", 0, []); applyPose(mesh, rotations); } sceneRef.current?.add(mesh); m.visible = false;
     rigRef.current = { mesh, mixer, clip };
   };
   const applyPose = (mesh: THREE.SkinnedMesh, r: [number, number, number][]) =>
@@ -211,7 +215,7 @@ const SculptStudio = () => {
     setKeys((k) => [...k.filter((x) => x.t !== keyT), { t: keyT, rot: rot.map((x) => [...x] as [number, number, number]) }]);
     toast.success(`Pose saved at ${keyT.toFixed(1)}s`); setKeyT((t) => +(t + 0.5).toFixed(1));
   };
-  const newBase = (b: Base) => { playAnim("none"); setBase(b); setGeometry(makeBase(b)); };
+  const newBase = (b: Base) => { playAnim("none"); setBase(b); setGeometry(makeBase(b)); setKeys([]); setRot(zeroRot(boneNames.length)); setKeyT(0); };
   const undo = () => {
     const prev = undoRef.current.pop(); const m = meshRef.current; if (!prev || !m) { toast.info("Nothing to undo"); return; }
     (m.geometry.attributes.position.array as Float32Array).set(prev);
@@ -224,30 +228,61 @@ const SculptStudio = () => {
     new GLTFExporter().parse(out, (res) => {
       const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([res as ArrayBuffer], { type: "model/gltf-binary" }));
       a.download = "sculpt.glb"; a.click(); toast.success("Exported sculpt.glb");
-    }, () => toast.error("Export failed"), { binary: true, animations: rig ? [rig.clip] : [] });
+    }, () => toast.error("Export failed"), { binary: true, animations: rig && rig.clip.tracks.length ? [rig.clip] : [] });
   };
   const sendTo3D = () => {
     const m = meshRef.current; if (!m) return;
     try { sendSculpt(m, color, `sculpt_${base}`); toast.success("Sent! Open the 3D Editor → model → Import sculpt"); }
     catch { toast.error("Sculpt too big to send — export the model and import the file instead"); }
   };
+  const projectJSON = () => {
+    const m = meshRef.current; if (!m) throw new Error("Sculpt not ready");
+    return serializeSculptProject(m.geometry, { base, color, skeleton: skel, animation: anim, rotations: rot, keys });
+  };
   const save = () => {
-    const m = meshRef.current; if (!m) return;
-    const p = m.geometry.attributes.position.array as Float32Array;
-    const bytes = new Uint8Array(p.buffer.slice(0));
-    let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-    try { localStorage.setItem(STORE, JSON.stringify({ base, color, pos: btoa(bin) })); toast.success("Sculpt saved on this device"); }
-    catch { toast.error("Not enough space — export the model instead"); }
+    try { localStorage.setItem(STORE, projectJSON()); toast.success("Character and animation saved on this device"); }
+    catch { toast.error("Not enough space — download a project backup instead"); }
+  };
+  const restore = (raw: string) => {
+    const data = JSON.parse(raw);
+    if (data.version === 2) {
+      const { project, geometry } = parseSculptProject(raw);
+      stopRig(); setGeometry(geometry); setBase(project.base); setColor(project.color);
+      setSkel(project.skeleton); setRot(project.rotations); setKeys(project.keys);
+      setBone(project.skeleton === "human" ? 3 : BONES - 1);
+      setKeyT(project.keys.length ? Math.max(...project.keys.map((key) => key.t)) + 0.5 : 0);
+      playAnim(project.animation, project.skeleton, project.keys, project.rotations);
+    } else {
+      // Retain access to device saves made before rigs were included.
+      if (!["sphere", "head", "box", "cylinder", "body"].includes(data.base) || typeof data.pos !== "string") throw new Error("Invalid legacy save");
+      const geometry = makeBase(data.base);
+      const bin = atob(data.pos); const buf = Uint8Array.from(bin, (char) => char.charCodeAt(0));
+      if (buf.byteLength !== geometry.attributes.position.array.byteLength) { geometry.dispose(); throw new Error("Invalid legacy geometry"); }
+      (geometry.attributes.position.array as Float32Array).set(new Float32Array(buf.buffer));
+      geometry.computeVertexNormals(); playAnim("none"); setGeometry(geometry); setBase(data.base); setColor(data.color);
+      setKeys([]); setRot(zeroRot(boneNames.length)); setKeyT(0);
+    }
   };
   const load = () => {
     const raw = localStorage.getItem(STORE); if (!raw) { toast.error("Nothing saved yet"); return; }
     try {
-      const d = JSON.parse(raw); const g = makeBase(d.base);
-      const bin = atob(d.pos); const buf = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-      (g.attributes.position.array as Float32Array).set(new Float32Array(buf.buffer));
-      g.computeVertexNormals(); playAnim("none"); setGeometry(g); setBase(d.base); setColor(d.color); toast.success("Sculpt loaded");
+      restore(raw); toast.success("Character project loaded");
     } catch { toast.error("Saved sculpt is damaged"); }
   };
+  const backup = () => {
+    try {
+      const url = URL.createObjectURL(new Blob([projectJSON()], { type: "application/json" }));
+      const a = document.createElement("a"); a.href = url; a.download = "character.codeforge.json"; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch { toast.error("Couldn't download the project"); }
+  };
+  const openBackup = async (file: File) => {
+    try {
+      if (file.size > 30 * 1024 * 1024) throw new Error("File too large");
+      restore(await file.text()); toast.success("Character backup restored");
+    } catch { toast.error("Couldn't open that character project"); }
+  };
+  const animationOptions: SculptProject["animation"][] = skel === "human" ? ["none", "pose", "walk", "wave", "dance", "nod"] : ["none", "pose", "sway", "bounce", "dance", "nod"];
 
   const BRUSHES: { id: Brush; label: string }[] = [
     { id: "pull", label: "Pull" }, { id: "push", label: "Push" }, { id: "smooth", label: "Smooth" },
@@ -266,6 +301,13 @@ const SculptStudio = () => {
         </div>
       </div>
       <div ref={mountRef} className="h-80 shrink-0 border-b border-border" />
+      <input ref={projectInputRef} type="file" accept=".json" className="hidden" aria-label="Open character project" onChange={(e) => {
+        const file = e.target.files?.[0]; if (file) void openBackup(file); e.target.value = "";
+      }} />
+      <div className="px-3 pt-2 flex flex-wrap gap-1">
+        <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={backup}><Download className="w-3 h-3 mr-1" />Project backup</Button>
+        <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => projectInputRef.current?.click()}><FolderOpen className="w-3 h-3 mr-1" />Open backup</Button>
+      </div>
       <div className="px-3 pt-2"><Button size="sm" className="w-full h-7 text-[10px]" onClick={sendTo3D}><Send className="w-3 h-3 mr-1" />Send to 3D Editor</Button></div>
       <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border">Left-drag on the clay to sculpt · right-drag to turn · scroll to zoom</div>
       <div className="p-3 space-y-3 overflow-auto">
@@ -299,11 +341,11 @@ const SculptStudio = () => {
                 }}>{k === "human" ? "Human (arms + legs)" : "Simple (one chain)"}</Button>
               ))}
             </div>
-            {(skel === "human" ? (["none", "pose", "walk", "wave", "dance", "nod"] as const) : (["none", "pose", "sway", "bounce", "dance", "nod"] as const)).map((a) => (
+            {animationOptions.map((a) => (
               <Button key={a} size="sm" variant={anim === a ? "default" : "outline"} className="h-7 text-[10px] px-1 capitalize" onClick={() => playAnim(a)}>{a === "none" ? "Off" : a}</Button>
             ))}
           </div>
-          {anim === "pose" && (
+          {(anim === "pose" || anim === "custom") && (
             <div className="mt-2 space-y-2 border border-border rounded p-2">
               <div className="flex items-center gap-1"><span className="mr-1">Bone</span>
                 <div className="flex flex-wrap gap-1">{boneNames.map((nm, i) => (
@@ -325,7 +367,7 @@ const SculptStudio = () => {
               </div>
               <div className="flex flex-wrap gap-1 text-[10px] text-muted-foreground">
                 {[...keys].sort((a, b) => a.t - b.t).map((k) => (
-                  <button key={k.t} className="px-1 border border-border rounded hover:text-foreground" title="Click to remove" onClick={() => setKeys((ks) => ks.filter((x) => x.t !== k.t))}>{k.t.toFixed(1)}s ×</button>
+                  <Button key={k.t} size="sm" variant="outline" className="h-6 px-1 text-[10px]" title="Remove pose" onClick={() => { playAnim("pose"); setKeys((ks) => ks.filter((x) => x.t !== k.t)); }}>{k.t.toFixed(1)}s ×</Button>
                 ))}
                 {!keys.length && <span>Bend the bones, then Save pose. Save 2+ poses at different times and press Play.</span>}
               </div>
